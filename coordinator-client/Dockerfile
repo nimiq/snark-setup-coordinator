@@ -1,4 +1,4 @@
-FROM rust:1.47 as rustbase
+FROM rust:1.71 as rustbase
 
 RUN apt update && \
     apt install -y \
@@ -31,13 +31,14 @@ RUN cd /app/snark-setup && \
     cargo build --release --target x86_64-pc-windows-gnu --bin phase1 && \
     CC="/osxcross/target/bin/o64-clang" CXX="/osxcross/target/bin/o64-clang++" RUSTFLAGS="-C linker=/osxcross/target/bin/x86_64-apple-darwin14-clang -C ar=/osxcross/target/bin/x86_64-apple-darwin14-ar" cargo build --release --target x86_64-apple-darwin --bin phase1
 
-FROM node:12.18.3-alpine3.12 as base
+FROM node:18-alpine as base
 
 ENV NPM_CONFIG_LOGLEVEL info
 
 # @celo/utils has dependencies in github
+# @nimiq/core needs python3 make gcc g++
 RUN apk update && apk upgrade && \
-    apk add --no-cache git
+    apk add --no-cache git python3 make gcc g++
 
 WORKDIR /app
 COPY package*.json ./
@@ -48,15 +49,16 @@ COPY . .
 
 RUN npm run build
 
-FROM node:12.18.3-alpine3.12
+FROM node:18-alpine
 
 # Ensure we only install dependencies (not devDependencies too)
 ENV NODE_ENV production
 ENV NPM_CONFIG_LOGLEVEL info
 
 # @celo/utils has dependencies in github
+# @nimiq/core needs python3 make gcc g++
 RUN apk update && apk upgrade && \
-    apk add --no-cache git
+    apk add --no-cache git python3 make gcc g++
 
 WORKDIR /app
 COPY package*.json ./

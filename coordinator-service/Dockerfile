@@ -1,10 +1,11 @@
-FROM node:12.18.3-alpine3.12 as base
+FROM node:18-alpine as base
 
 ENV NPM_CONFIG_LOGLEVEL info
 
 # @celo/utils has dependencies in github
+# @nimiq/core needs python3 make gcc g++
 RUN apk update && apk upgrade && \
-    apk add --no-cache git
+    apk add --no-cache git python3 make gcc g++
 
 WORKDIR /app
 COPY package*.json ./
@@ -15,15 +16,16 @@ COPY . .
 
 RUN npm run build
 
-FROM node:12.18.3-alpine3.12
+FROM node:18-alpine
 
 # Ensure we only install dependencies (not devDependencies too)
 ENV NODE_ENV production
 ENV NPM_CONFIG_LOGLEVEL info
 
 # @celo/utils has dependencies in github
+# @nimiq/core needs python3 make gcc g++
 RUN apk update && apk upgrade && \
-    apk add --no-cache git
+    apk add --no-cache git python3 make gcc g++
 
 WORKDIR /app
 COPY package*.json ./
