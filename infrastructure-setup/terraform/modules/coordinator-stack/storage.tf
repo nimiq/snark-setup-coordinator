@@ -5,7 +5,7 @@ resource "azurerm_storage_account" "coordinator_storage" {
   location                 = data.azurerm_resource_group.existing.location
   account_tier             = "Standard"
   account_replication_type = "GRS"
-  allow_blob_public_access = true
+  allow_nested_items_to_be_public = true
   tags = {
     environment = var.environment
   }

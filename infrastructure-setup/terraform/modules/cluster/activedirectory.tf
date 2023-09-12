@@ -1,12 +1,6 @@
-resource "random_password" "coordinator_sp_password" {
-  length           = 32
-  special          = true
-  override_special = "_%@"
-}
-
 # An application for the coordinator cluster
 resource "azuread_application" "coordinator_cluster" {
-  name = "NimiqCeremony${var.environment}"
+  display_name = "NimiqCeremony${var.environment}"
 }
 
 
@@ -28,6 +22,5 @@ resource "azurerm_role_assignment" "cluster_networking" {
 # Really annoying regression in the terraform provider here
 resource "azuread_service_principal_password" "coordinator_cluster" {
   service_principal_id = azuread_service_principal.coordinator_cluster.id
-  value                = random_password.coordinator_sp_password.result
   end_date_relative    = "1200h"
 }

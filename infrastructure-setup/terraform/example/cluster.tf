@@ -1,12 +1,6 @@
-resource "random_password" "coordinator_sp_password" {
-  length           = 32
-  special          = true
-  override_special = "_%@"
-}
-
 # An application for the coordinator cluster
 resource "azuread_application" "coordinator_cluster" {
-  name = "NimiqCeremony${local.environment}"
+  display_name = "NimiqCeremony${local.environment}"
 }
 
 
@@ -28,7 +22,6 @@ resource "azurerm_role_assignment" "cluster_networking" {
 # Really annoying regression in the terraform provider here
 resource "azuread_service_principal_password" "coordinator_cluster" {
   service_principal_id = azuread_service_principal.coordinator_cluster.id
-  value                = random_password.coordinator_sp_password.result
   end_date_relative    = "1200h"
 }
 
@@ -41,16 +34,23 @@ module "network" {
   subnet_prefixes     = ["10.1.1.0/24"]
   subnet_names        = ["private"]
   depends_on          = [azurerm_resource_group.coordinator_group]
+  use_for_each        = false
 }
 
 module "aks" {
   source              = "Azure/aks/azurerm"
   resource_group_name = azurerm_resource_group.coordinator_group.name
   client_id           = azuread_application.coordinator_cluster.application_id
-  client_secret       = random_password.coordinator_sp_password.result
+  client_secret       = azuread_service_principal_password.coordinator_cluster.value
   prefix              = local.cluster_prefix
   vnet_subnet_id      = module.network.vnet_subnets[0]
   os_disk_size_gb     = 50
   agents_count        = 3
+  role_based_access_control_enabled = true
+  rbac_aad_azure_rbac_enabled = true
+  rbac_aad            = true
+  rbac_aad_managed    = true
+  rbac_aad_client_app_id = azuread_application.coordinator_cluster.application_id
+  rbac_aad_server_app_secret = azuread_service_principal_password.coordinator_cluster.value
   depends_on          = [module.network, azuread_service_principal_password.coordinator_cluster]
 }

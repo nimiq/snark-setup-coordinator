@@ -3,7 +3,7 @@ coordinator:
   enabled: true
   fullName: "nimiq-coordinator-{{$.Values.environment}}"
   image: 
-    repo: "us.gcr.io/nimiq-testnet"
+    repo: "us-west1-docker.pkg.dev/iron-fountain-169200/nimiq"
     image: coordinator-service
     tag: test
     full: "{{$.Values.coordinator.image.repo}}/{{$.Values.coordinator.image.image}}:{{$.Values.coordinator.image.tag}}"
@@ -23,7 +23,7 @@ participant:
   enabled: false
   fullName: "nimiq-verifier-{{$.Values.environment}}"
   image: 
-    repo: "us.gcr.io/nimiq-testnet"
+    repo: "us-west1-docker.pkg.dev/iron-fountain-169200/nimiq"
     image: snark-ceremony-operator
     tag: test
     full: "{{$.Values.participant.image.repo}}/{{$.Values.participant.image.image}}:{{$.Values.participant.image.tag}}"
@@ -37,7 +37,7 @@ monitor:
   enabled: false
   fullName: "nimiq-monitor-{{$.Values.environment}}"
   image: 
-    repo: "us.gcr.io/nimiq-testnet"
+    repo: "us-west1-docker.pkg.dev/iron-fountain-169200/nimiq"
     image: snark-ceremony-operator
     tag: test
     full: "{{$.Values.monitor.image.repo}}/{{$.Values.monitor.image.image}}:{{$.Values.monitor.image.tag}}"

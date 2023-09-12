@@ -1,11 +1,11 @@
 provider "azurerm" {
-  version = "=2.20.0"
+  version = "=3.72.0"
   features {}
 }
 
 # Configure the Microsoft Azure Active Directory Provider
 provider "azuread" {
-  version = "~> 1.0.0"
+  version = "~> 2.41.0"
 }
 
 # Local variables that define the deployment, make changes here as-needed
@@ -48,29 +48,27 @@ resource "azurerm_resource_group" "coordinator_group" {
 # The Helm 3 Provider, you can simply configure this if you need to deploy to an existing cluster.
 # Ex. Azure Cluster Data Source: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/kubernetes_cluster
 provider helm {
-  version = "~> 1.3.2"
+  version = "~> 2.11.0"
   debug   = true
   kubernetes {
-    host                   = module.aks.host
-    client_certificate     = base64decode(module.aks.client_certificate)
-    client_key             = base64decode(module.aks.client_key)
-    cluster_ca_certificate = base64decode(module.aks.cluster_ca_certificate)
-    username               = module.aks.username
-    password               = module.aks.password
-    load_config_file       = false
+    host                   = module.aks.admin_host
+    client_certificate     = base64decode(module.aks.admin_client_certificate)
+    client_key             = base64decode(module.aks.admin_client_key)
+    cluster_ca_certificate = base64decode(module.aks.admin_cluster_ca_certificate)
+    username               = module.aks.admin_username
+    password               = module.aks.admin_password
   }
 }
 
 # Kubernetes Provider (used for creating namespaces)
 provider "kubernetes" {
-  version                = "~> 1.13.3"
-  host                   = module.aks.host
-  client_certificate     = base64decode(module.aks.client_certificate)
-  client_key             = base64decode(module.aks.client_key)
-  cluster_ca_certificate = base64decode(module.aks.cluster_ca_certificate)
-  username               = module.aks.username
-  password               = module.aks.password
-  load_config_file       = false
+  version                = "~> 2.23.0"
+  host                   = module.aks.admin_host
+  client_certificate     = base64decode(module.aks.admin_client_certificate)
+  client_key             = base64decode(module.aks.admin_client_key)
+  cluster_ca_certificate = base64decode(module.aks.admin_cluster_ca_certificate)
+  username               = module.aks.admin_username
+  password               = module.aks.admin_password
 }
 
 # The coordinator stack and any other kubernetes resources that are needed
@@ -86,6 +84,7 @@ module "deployment" {
   monitor_polling_interval      = local.monitor_polling_interval
   initial_verifier_public_keys  = local.initial_verifier_public_keys
   verifier_credentials          = local.verifier_credentials
+  verifier_count                = length(local.verifier_credentials)
   resource_group_name           = local.resource_group_name
   log_analytics_workspace_name  = "${local.cluster_prefix}-workspace"
   azure_monitor_alerts_webhook_uri = local.victorops_webhook_uri
@@ -104,7 +103,7 @@ output "storage_account_name" {
 }
 
 output "storage_account_key" {
-  value = module.deployment.storage_account_key
+  value = nonsensitive(module.deployment.storage_account_key)
 }
 
 output "kube_ctl_command" {

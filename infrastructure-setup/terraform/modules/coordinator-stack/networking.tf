@@ -4,6 +4,7 @@ resource "azurerm_public_ip" "coordinator" {
   resource_group_name = data.azurerm_resource_group.existing.name
   location            = data.azurerm_resource_group.existing.location
   allocation_method   = "Static"
+  sku                 = "Standard"
 
   tags = {
     environment = var.environment
@@ -12,9 +13,8 @@ resource "azurerm_public_ip" "coordinator" {
 
 resource "azurerm_frontdoor" "coordinator" {
   name                                         = "nimiq-setup-${var.environment}"
-  location                                     = "Global"
+  # location                                     = "Global"
   resource_group_name                          = data.azurerm_resource_group.existing.name
-  enforce_backend_pools_certificate_name_check = false
 
   routing_rule {
     name               = "RoutingRuleNimiq${var.environment}"
@@ -35,6 +35,10 @@ resource "azurerm_frontdoor" "coordinator" {
     name = "HealthProbeNimiq${var.environment}"
   }
 
+  backend_pool_settings {
+    enforce_backend_pools_certificate_name_check = false
+  }
+  
   backend_pool {
     name = "CoordinatorLoadBalancer${var.environment}"
     backend {
@@ -51,6 +55,6 @@ resource "azurerm_frontdoor" "coordinator" {
   frontend_endpoint {
     name                              = "NimiqCeremonyFrontEnd${var.environment}"
     host_name                         = "nimiq-setup-${var.environment}.azurefd.net"
-    custom_https_provisioning_enabled = false
   }
 }
+
