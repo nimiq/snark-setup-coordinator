@@ -140,7 +140,7 @@ Enter your Nimiq setup passphrase:
 Next, we must initialize the ceremony using the `new_ceremony` binary from the [operator repo](https://github.com/nimiq/snark-setup-operator). 
 
 ```
-RUST_LOG=info  cargo run  --release --bin new_ceremony -- --upload-mode azure --storage-account nimiqceremonyexample --container chunks --access-key <Azure-Key-From-Output> --chunk-size 8 --powers 12 --verifier <Your-Verifier-PublicKey> --participant <Participant-PublicKey> --server-url '<Nimiq-Coordinator-Uri>' --keys-path /path/to/nimiq.keys 
+RUST_LOG=info  cargo run  --release --bin new_ceremony -- --upload-mode azure --storage-account nimiqceremonyexample --container chunks --access-key <Azure-Key-From-Output> --chunk-size 8 --powers 12 --verifier <Your-Verifier-PublicKey> --participant <Participant-PublicKey> --server-url '<Nimiq-Coordinator-Uri>' --keys-file /path/to/nimiq.keys 
 ```
 
 This will then generate and upload all the Chunks and challenges to Azure Block Storage, and configure the Coordinator's local JSON DB. You can verify it is set up by visiting 
@@ -150,7 +150,7 @@ This will then generate and upload all the Chunks and challenges to Azure Block 
 Once the ceremony is initialized, the deployment is ready for participants to begin contributing. 
 
 ```
-RUST_LOG=info cargo run --release --bin contribute -- --coordinator-url http://$COORDINATOR_URI --keys-path /path/to/nimiq.keys --participation-mode contribute
+RUST_LOG=info cargo run --release --bin contribute -- --coordinator-url http://$COORDINATOR_URI --keys-file /path/to/nimiq.keys --participation-mode contribute
 ```
 
 ## Resetting the Ceremony
