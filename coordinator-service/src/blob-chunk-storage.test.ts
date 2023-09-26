@@ -33,7 +33,7 @@ describe('BlobChunkStorage', () => {
                         contributedLocation: null,
                         verifierId: 'verifier0',
                         verifiedLocation:
-                            'http://testing:8080/chunks/chunk-1/contribution/0',
+                            'http://testing:8080/chunks/1-chunk-1/contribution/0',
                         verified: true,
                     },
                 ],

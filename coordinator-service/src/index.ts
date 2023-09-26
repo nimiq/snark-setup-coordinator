@@ -131,28 +131,30 @@ function http(args): void {
 
         app.use(bodyParser.raw({ limit: '5mb' }))
         app.post(
-            '/chunks/:round/:chunkId/contribution/:version',
+            '/chunks/:round/:setupId-:chunkId/contribution/:version',
             authenticateRequest,
             async (req, res) => {
+                const setupId = req.params.setupId
                 const chunkId = req.params.chunkId
                 const version = req.params.version
                 const round = parseInt(req.params.round)
                 const content = req.body
 
                 logger.debug(
-                    `POST /chunks/${round}/${chunkId}/contribution/${version}`,
+                    `POST /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
                 )
                 diskChunkStorage.setChunk(round, chunkId, version, content)
                 res.json({ status: 'ok' })
             },
         )
-        app.get('/chunks/:round/:chunkId/contribution/:version', (req, res) => {
+        app.get('/chunks/:round/:setupId-:chunkId/contribution/:version', (req, res) => {
+            const setupId = req.params.setupId
             const chunkId = req.params.chunkId
             const version = req.params.version
             const round = parseInt(req.params.round)
 
             logger.debug(
-                `GET /chunks/${round}/${chunkId}/contribution/${version}`,
+                `GET /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
             )
             try {
                 const content = diskChunkStorage.getChunk(

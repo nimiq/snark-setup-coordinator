@@ -58,7 +58,8 @@ export function initExpress({
         allowVerifiers,
         bodyParser.json({ limit: '1000mb' }),
         (req, res) => {
-            const ceremony = req.body
+            const ceremony = req.body.setup
+            const version = req.body.version
             logger.debug('PUT /ceremony')
             try {
                 coordinator.setCeremony(ceremony)
@@ -72,17 +73,40 @@ export function initExpress({
         },
     )
 
-    app.get('/contributor/:id/chunks', (req, res) => {
+    app.put(
+        '/setup',
+        authenticateRequests,
+        allowVerifiers,
+        bodyParser.json({ limit: '1000mb' }),
+        (req, res) => {
+            const setup = req.body.setup
+            const version = req.body.version
+            logger.debug('PUT /setup')
+            try {
+                coordinator.setSetup(version, setup)
+                res.json({
+                    status: 'ok',
+                })
+            } catch (err) {
+                logger.warn(err.message)
+                res.status(409).json({ status: 'error', message: err.message })
+            }
+        },
+    )
+
+    app.get('/contributor/:setupId-:chunkId/chunks', (req, res) => {
         const participantId = req.params.id
+        const setupId = req.params.setupId
         logger.debug(`GET /contributor/${participantId}/chunks`)
         try {
-            const chunks = coordinator.getContributorChunks(participantId)
-            const lockedChunks = coordinator.getLockedChunks(participantId)
+            const chunks = coordinator.getContributorChunks(setupId, participantId)
+            const lockedChunks = coordinator.getLockedChunks(setupId, participantId)
             const numNonContributed = coordinator.getNumNonContributedChunks(
+                setupId,
                 participantId,
             )
-            const numChunks = coordinator.getNumChunks()
-            const parameters = coordinator.getParameters()
+            const numChunks = coordinator.getNumChunks(setupId)
+            const parameters = coordinator.getParameters(setupId)
             const maxLocks = coordinator.getMaxLocks()
             const shutdownSignal = coordinator.getShutdownSignal()
             const phase = coordinator.getPhase()
@@ -105,15 +129,16 @@ export function initExpress({
         }
     })
 
-    app.get('/verifier/:id/chunks', (req, res) => {
+    app.get('/verifier/:setupId-:chunkId/chunks', (req, res) => {
         const participantId = req.params.id
+        const setupId = req.params.setupId
         logger.debug(`GET /verifier/${participantId}/chunks`)
         try {
-            const chunks = coordinator.getVerifierChunks()
-            const lockedChunks = coordinator.getLockedChunks(participantId)
+            const chunks = coordinator.getVerifierChunks(setupId)
+            const lockedChunks = coordinator.getLockedChunks(setupId, participantId)
             const numNonContributed = chunks.length
-            const numChunks = coordinator.getNumChunks()
-            const parameters = coordinator.getParameters()
+            const numChunks = coordinator.getNumChunks(setupId)
+            const parameters = coordinator.getParameters(setupId)
             const maxLocks = coordinator.getMaxLocks()
             const shutdownSignal = coordinator.getShutdownSignal()
             const phase = coordinator.getPhase()
@@ -137,15 +162,16 @@ export function initExpress({
     })
 
     app.post(
-        '/chunks/:id/lock',
+        '/chunks/:setupId-:chunkId/lock',
         authenticateRequests,
         allowParticipants,
         (req, res) => {
             const participantId = req.participantId
+            const setupId = req.params.setupId
             const chunkId = req.params.id
-            logger.debug(`POST /chunks/${chunkId}/lock ${participantId}`)
+            logger.debug(`POST /chunks/${setupId}-${chunkId}/lock ${participantId}`)
             try {
-                const locked = coordinator.tryLockChunk(chunkId, participantId)
+                const locked = coordinator.tryLockChunk(setupId, chunkId, participantId)
                 res.json({
                     status: 'ok',
                     result: {
@@ -221,11 +247,12 @@ export function initExpress({
         },
     )
 
-    app.get('/chunks/:id/info', (req, res) => {
+    app.get('/chunks/:setupId-:chunkId/info', (req, res) => {
+        const setupId = req.params.setupId
         const chunkId = req.params.id
-        logger.debug(`GET /chunks/${chunkId}/info`)
+        logger.debug(`GET /chunks/${setupId}-${chunkId}/info`)
         try {
-            const chunk = coordinator.getChunkDownloadInfo(chunkId)
+            const chunk = coordinator.getChunkDownloadInfo(setupId, chunkId)
             res.json({
                 status: 'ok',
                 result: chunk,
@@ -237,23 +264,25 @@ export function initExpress({
     })
 
     app.post(
-        '/chunks/:id/unlock',
+        '/chunks/:setupId-:chunkId/unlock',
         authenticateRequests,
         allowParticipants,
         bodyParser.json(),
         (req, res) => {
             const participantId = req.participantId
+            const setupId = req.params.setupId
             const chunkId = req.params.id
             const error = req.body.error
-            logger.debug(`POST /chunks/${chunkId}/unlock ${participantId}`)
+            logger.debug(`POST /chunks/${setupId}-${chunkId}/unlock ${participantId}`)
             try {
                 const unlocked = coordinator.tryUnlockChunk(
+                    setupId,
                     chunkId,
                     participantId,
                 )
                 if (error) {
                     logger.error(
-                        `participant ${participantId} reported error for chunk ${chunkId}: ${error}`,
+                        `participant ${participantId} reported error for chunk ${setupId}-${chunkId}: ${error}`,
                     )
                 }
                 res.json({
@@ -272,17 +301,19 @@ export function initExpress({
     )
 
     app.get(
-        '/chunks/:id/contribution',
+        '/chunks/:setupId-:chunkId/contribution',
         authenticateRequests,
         allowParticipants,
         (req, res) => {
             const participantId = req.participantId
+            const setupId = req.params.setupId
             const chunkId = req.params.id
 
-            logger.debug(`GET /chunks/${chunkId}/contribution ${participantId}`)
-            const chunk = coordinator.getChunk(chunkId)
+            logger.debug(`GET /chunks/${setupId}-${chunkId}/contribution ${participantId}`)
+            const chunk = coordinator.getChunk(setupId, chunkId)
             const round = coordinator.getRound()
             const writeUrl = chunkStorage.getChunkWriteLocation({
+                setupId,
                 round,
                 chunk,
                 participantId,
@@ -299,23 +330,25 @@ export function initExpress({
     )
 
     app.post(
-        '/chunks/:id/contribution',
+        '/chunks/:setupId-:chunkId/contribution',
         authenticateRequests,
         allowParticipants,
         bodyParser.json(),
         async (req, res) => {
             const participantId = req.participantId
+            const setupId = req.params.setupId
             const chunkId = req.params.id
 
             logger.debug(
-                `POST /chunks/${chunkId}/contribution ${participantId}`,
+                `POST /chunks/${setupId}-${chunkId}/contribution ${participantId}`,
             )
-            const chunk = coordinator.getChunk(chunkId)
+            const chunk = coordinator.getChunk(setupId, chunkId)
             const round = coordinator.getRound()
 
             let url
             try {
                 url = await chunkStorage.copyChunk({
+                    setupId,
                     round,
                     chunk,
                     participantId,
@@ -333,7 +366,7 @@ export function initExpress({
                 const body = req.body
                 if (!isSignedData(body)) {
                     throw new Error(
-                        `Body for chunk ${chunkId} by participant ${participantId} should have been signed data: ${JSON.stringify(
+                        `Body for chunk ${setupId}-${chunkId} by participant ${participantId} should have been signed data: ${JSON.stringify(
                             body,
                         )}`,
                     )
@@ -347,10 +380,11 @@ export function initExpress({
                     )
                 ) {
                     throw new Error(
-                        `Could not verify signed data for chunk ${chunkId} by participant ${participantId}`,
+                        `Could not verify signed data for chunk ${setupId}-${chunkId} by participant ${participantId}`,
                     )
                 }
                 await coordinator.contributeChunk({
+                    setupId,
                     chunkId,
                     participantId,
                     location: url,

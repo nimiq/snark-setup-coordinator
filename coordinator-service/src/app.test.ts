@@ -5,7 +5,7 @@ import tmp from 'tmp'
 
 import { AuthenticateDummy } from './authenticate-dummy'
 import { initExpress } from './app'
-import { Ceremony } from './ceremony'
+import { Ceremony, Setup } from './ceremony'
 import { DiskCoordinator } from './disk-coordinator'
 import { DiskChunkStorage } from './disk-chunk-storage'
 
@@ -46,74 +46,85 @@ describe('app', () => {
             version: 0,
             maxLocks: 1,
             shutdownSignal: false,
-            parameters: {},
             contributorIds: ['frank', 'becky', 'pat'],
             verifierIds: ['verifier0'],
-            chunks: [
+            setups: [
                 {
-                    chunkId: '1',
-                    lockHolder: null,
-                    contributions: [
+                    setupId: '1',
+                    parameters: {
+                        "provingSystem": "groth16",
+                        "curveKind": "bw6",
+                        "chunkSize": 1024,
+                        "batchSize": 1024,
+                        "power": 12
+                    },
+                    chunks: [
                         {
-                            contributorId: null,
-                            contributedLocation: null,
-                            verifiedLocation: '/some/location/1',
-                            verifierId: 'verifier0',
-                            verified: true,
-                            verifiedData: testData,
+                            chunkId: '1',
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: null,
+                                    contributedLocation: null,
+                                    verifiedLocation: '/some/location/1',
+                                    verifierId: 'verifier0',
+                                    verified: true,
+                                    verifiedData: testData,
+                                },
+                            ],
+                        },
+                        {
+                            chunkId: '2',
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: 'pat',
+                                    contributedLocation: '/some/location/2',
+                                    contributedData: testData,
+                                    verifierId: null,
+                                    verifiedLocation: null,
+                                    verified: false,
+                                },
+                            ],
+                        },
+                        {
+                            chunkId: '3',
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: 'pat',
+                                    contributedLocation: '/some/location/2',
+                                    contributedData: testData,
+                                    verifierId: null,
+                                    verifiedLocation: null,
+                                    verified: true,
+                                },
+                            ],
+                        },
+                        {
+                            chunkId: '4',
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: 'pat',
+                                    contributedLocation: '/some/location/2',
+                                    contributedData: testData,
+                                    verifierId: null,
+                                    verifiedLocation: '/some/location/123',
+                                    verified: true,
+                                },
+                                {
+                                    contributorId: 'bill',
+                                    contributedLocation: '/some/location/234',
+                                    contributedData: testData,
+                                    verifierId: null,
+                                    verifiedLocation: null,
+                                    verified: false,
+                                },
+                            ],
                         },
                     ],
-                },
-                {
-                    chunkId: '2',
-                    lockHolder: null,
-                    contributions: [
-                        {
-                            contributorId: 'pat',
-                            contributedLocation: '/some/location/2',
-                            contributedData: testData,
-                            verifierId: null,
-                            verifiedLocation: null,
-                            verified: false,
-                        },
-                    ],
-                },
-                {
-                    chunkId: '3',
-                    lockHolder: null,
-                    contributions: [
-                        {
-                            contributorId: 'pat',
-                            contributedLocation: '/some/location/2',
-                            contributedData: testData,
-                            verifierId: null,
-                            verifiedLocation: null,
-                            verified: true,
-                        },
-                    ],
-                },
-                {
-                    chunkId: '4',
-                    lockHolder: null,
-                    contributions: [
-                        {
-                            contributorId: 'pat',
-                            contributedLocation: '/some/location/2',
-                            contributedData: testData,
-                            verifierId: null,
-                            verifiedLocation: '/some/location/123',
-                            verified: true,
-                        },
-                        {
-                            contributorId: 'bill',
-                            contributedLocation: '/some/location/234',
-                            contributedData: testData,
-                            verifierId: null,
-                            verifiedLocation: null,
-                            verified: false,
-                        },
-                    ],
-                },
+                }
             ],
         }
 
@@ -138,19 +149,29 @@ describe('app', () => {
         })
     })
 
-    describe('PUT /ceremony', () => {
-        it('updates ceremony', async () => {
+    describe('PUT /setup', () => {
+        it('updates setup', async () => {
             let res
 
             res = await chai.request(app).get('/ceremony')
             expect(res).to.have.status(200)
 
             const newCeremony = res.body.result
-            newCeremony.chunks[0].lockHolder = 'pat'
+            newCeremony.setups[0] = {
+                "setupId": "0",
+                "parameters": {
+                    "provingSystem": "groth16",
+                    "curveKind": "bw6",
+                    "chunkSize": 1024,
+                    "batchSize": 1024,
+                    "power": 12
+                },
+                "chunks": []
+            }
 
             res = await chai
                 .request(app)
-                .put('/ceremony')
+                .put('/setup')
                 .set('authorization', 'dummy verifier0')
                 .send(newCeremony)
             expect(res).to.have.status(200)
@@ -159,7 +180,7 @@ describe('app', () => {
             expect(res).to.have.status(200)
 
             newCeremony.version = 1
-            expect(res.body.result).to.deep.equal(newCeremony)
+            expect(res.body.result).to.deep.equal(newCeremony.setups)
         })
 
         it('rejects invalid versions', async () => {
@@ -186,11 +207,12 @@ describe('app', () => {
         })
     })
 
-    describe('GET /contributor/:id/chunks', () => {
+    describe('GET /contributor/:setupId-:chunkId/chunks', () => {
         it('matches ceremony', async () => {
             const res = await chai.request(app).get('/contributor/pat/chunks')
             expect(res).to.have.status(200)
             const expected = {
+                setupId: '1',
                 chunks: [{ lockHolder: null, chunkId: '1' }],
                 lockedChunks: [],
                 numNonContributed: 1,
@@ -211,11 +233,12 @@ describe('app', () => {
         })
     })
 
-    describe('GET /chunks/:id/info', () => {
+    describe('GET /chunks/:setupId-:chunkId/info', () => {
         it('info for chunk 1', async () => {
-            const res = await chai.request(app).get('/chunks/1/info')
+            const res = await chai.request(app).get('/chunks/1-1/info')
             expect(res).to.have.status(200)
             const expected = {
+                setupId: '1',
                 chunkId: '1',
                 lockHolder: null,
                 lastResponseUrl: null,
@@ -225,9 +248,10 @@ describe('app', () => {
             expect(res.body.result).to.deep.equal(expected)
         })
         it('info for chunk 2', async () => {
-            const res = await chai.request(app).get('/chunks/2/info')
+            const res = await chai.request(app).get('/chunks/1-2/info')
             expect(res).to.have.status(200)
             const expected = {
+                setupId: '1',
                 chunkId: '2',
                 lockHolder: null,
                 lastResponseUrl: '/some/location/2',
@@ -237,9 +261,10 @@ describe('app', () => {
             expect(res.body.result).to.deep.equal(expected)
         })
         it('info for chunk 4', async () => {
-            const res = await chai.request(app).get('/chunks/4/info')
+            const res = await chai.request(app).get('/chunks/1-4/info')
             expect(res).to.have.status(200)
             const expected = {
+                setupId: '1',
                 chunkId: '4',
                 lockHolder: null,
                 lastResponseUrl: '/some/location/234',
@@ -249,19 +274,20 @@ describe('app', () => {
             expect(res.body.result).to.deep.equal(expected)
         })
         it('info for unknown chunk', async () => {
-            const res = await chai.request(app).get('/chunks/2345/info')
+            const res = await chai.request(app).get('/chunks/1-2345/info')
             expect(res).to.have.status(400)
         })
     })
 
-    describe('GET /chunks/:id/lock', () => {
+    describe('GET /chunks/:setupId-:chunkId/lock', () => {
         it('locks unlocked chunk', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
             expect(res.body.result.chunkId).to.equal('1')
+            expect(res.body.result.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             const resInfo = await chai
@@ -274,11 +300,11 @@ describe('app', () => {
         it('returns false if lock holder tries another lock', async () => {
             await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
             const res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
             expect(res.body.result.locked).to.equal(false)
@@ -287,7 +313,7 @@ describe('app', () => {
         it('rejects if contributor attempts to lock unverified', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/2/lock')
+                .post('/chunks/1-2/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(400)
         })
@@ -295,7 +321,7 @@ describe('app', () => {
         it('rejects if contributor attempts to lock a chunk it has already contributed to', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/3/lock')
+                .post('/chunks/1-3/lock')
                 .set('authorization', 'dummy pat')
             expect(res).to.have.status(400)
         })
@@ -303,7 +329,7 @@ describe('app', () => {
         it('rejects if verifier attempts to lock verified', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy verifier0')
             expect(res).to.have.status(400)
         })
@@ -330,53 +356,55 @@ describe('app', () => {
 
             res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
                 .request(app)
-                .post('/chunks/3/lock')
+                .post('/chunks/1-3/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
                 .request(app)
-                .post('/chunks/4/lock')
+                .post('/chunks/1-4/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(400)
         })
     })
 
-    describe('GET /chunks/:id/unlock', () => {
+    describe('GET /chunks/:setupId-:chunkId/unlock', () => {
         it('unlocks locked chunk', async () => {
             let res
 
             res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
             expect(res.body.result.chunkId).to.equal('1')
+            expect(res.body.result.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
                 .request(app)
-                .post('/chunks/1/unlock')
+                .post('/chunks/1-1/unlock')
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
             expect(res.body.result.chunkId).to.equal('1')
+            expect(res.body.result.setupId).to.equal('1')
             expect(res.body.result.unlocked).to.equal(true)
         })
 
         it('returns 400 if participant does not hold lock', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/1/unlock')
+                .post('/chunks/1-1/unlock')
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(400)
@@ -387,50 +415,52 @@ describe('app', () => {
 
             res = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
             expect(res.body.result.chunkId).to.equal('1')
+            expect(res.body.result.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
                 .request(app)
-                .post('/chunks/1/unlock')
+                .post('/chunks/1-1/unlock')
                 .set('authorization', 'dummy frank')
                 .send({ error: 'stuff' })
             expect(res).to.have.status(200)
             expect(res.body.result.chunkId).to.equal('1')
+            expect(res.body.result.setupId).to.equal('1')
             expect(res.body.result.unlocked).to.equal(true)
             expect(res.body.result.error).to.equal('stuff')
         })
     })
 
-    describe('GET /chunks/:id/contribute', () => {
+    describe('GET /chunks/:setupId-:chunkId/contribute', () => {
         it('returns a write URL', async () => {
             const res = await chai
                 .request(app)
-                .get('/chunks/1/contribution')
+                .get('/chunks/1-1/contribution')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
             expect(res.body.result.writeUrl).to.be.a('string')
         })
     })
 
-    describe('POST /chunks/:id/contribute', () => {
+    describe('POST /chunks/:setupId-:chunkId/contribute', () => {
         it('handles contribution copy failures', async () => {
             chunkStorage.copyChunk = (): string => {
                 throw new Error('fail')
             }
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/1/contribution')
+                .post('/chunks/1-1/contribution')
                 .set('authorization', 'dummy frank')
             expect(contributionRes).to.have.status(400)
         })
@@ -438,7 +468,7 @@ describe('app', () => {
         it('rejects unlocked chunk contributions', async () => {
             const res = await chai
                 .request(app)
-                .post('/chunks/1/contribution')
+                .post('/chunks/1-1/contribution')
                 .set('authorization', 'dummy frank')
                 .send({
                     data: {
@@ -454,15 +484,16 @@ describe('app', () => {
         })
 
         it('accepts contributions to locked chunk', async () => {
+            const setupId = '1'
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/1/contribution')
+                .post('/chunks/1-1/contribution')
                 .set('authorization', 'dummy frank')
                 .send({
                     data: {
@@ -478,7 +509,8 @@ describe('app', () => {
             const ceremony: Ceremony = (
                 await chai.request(app).get('/ceremony')
             ).body.result
-            const chunk = ceremony.chunks.find((chunk) => chunk.chunkId === '1')
+
+            const chunk = ceremony.setups.find((setup) => setup.setupId === setupId).chunks.find((chunk) => chunk.chunkId === '1')
             expect(chunk.lockHolder).to.equal(null)
             const lockHolderTime = new Date(chunk.metadata.lockHolderTime)
             expect(lockHolderTime).to.be.greaterThan(new Date(null))
@@ -493,13 +525,13 @@ describe('app', () => {
         it('rejects contributions with wrong contribution hash', async () => {
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/1/lock')
+                .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/1/contribution')
+                .post('/chunks/1-1/contribution')
                 .set('authorization', 'dummy frank')
                 .send({
                     data: {
@@ -515,15 +547,16 @@ describe('app', () => {
         })
 
         it('sets verified flag for verified contributions', async () => {
+            const setupId = '1'
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/2/lock')
+                .post('/chunks/1-2/lock')
                 .set('authorization', 'dummy verifier0')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/2/contribution')
+                .post('/chunks/1-2/contribution')
                 .set('authorization', 'dummy verifier0')
                 .send({
                     data: {
@@ -541,7 +574,7 @@ describe('app', () => {
             const ceremony: Ceremony = (
                 await chai.request(app).get('/ceremony')
             ).body.result
-            const chunk = ceremony.chunks.find((chunk) => chunk.chunkId === '2')
+            const chunk = ceremony.setups.find((setup) => setup.setupId === setupId).chunks.find((chunk) => chunk.chunkId === '2')
             const contribution =
                 chunk.contributions[chunk.contributions.length - 1]
             expect(contribution.verified).to.equal(true)
@@ -552,13 +585,13 @@ describe('app', () => {
         it('rejects verified flag with wrong contribution hash', async () => {
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/2/lock')
+                .post('/chunks/1-2/lock')
                 .set('authorization', 'dummy verifier0')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/2/contribution')
+                .post('/chunks/1-2/contribution')
                 .set('authorization', 'dummy verifier0')
                 .send({
                     data: {
@@ -577,13 +610,13 @@ describe('app', () => {
         it('rejects verified flag with wrong response hash', async () => {
             const lockRes = await chai
                 .request(app)
-                .post('/chunks/2/lock')
+                .post('/chunks/1-2/lock')
                 .set('authorization', 'dummy verifier0')
                 .send({ signature: 'dummy-signature' })
             expect(lockRes).to.have.status(200)
             const contributionRes = await chai
                 .request(app)
-                .post('/chunks/2/contribution')
+                .post('/chunks/1-2/contribution')
                 .set('authorization', 'dummy verifier0')
                 .send({
                     data: {

@@ -18,6 +18,8 @@ export interface ChunkContribution {
 }
 
 export interface ChunkData {
+    setupId: string
+    parameters: SetupParameters
     chunkId: string
     contributions: ChunkContribution[]
 }
@@ -28,16 +30,15 @@ export interface LockedChunkDataMetadata {
 
 export interface LockedChunkData extends ChunkData {
     metadata: LockedChunkDataMetadata
-
     lockHolder: string
 }
 
-export interface CeremonyParameters {
+export interface SetupParameters {
     provingSystem?: string
-    curveKind?: string
-    chunkSize?: number
-    batchSize?: number
-    power?: number
+    curveKind: string
+    chunkSize: number
+    batchSize: number
+    power: number
 }
 
 export interface Attestation {
@@ -46,12 +47,17 @@ export interface Attestation {
     signature: string
 }
 
-export interface Ceremony {
-    parameters: CeremonyParameters
+export interface Setup {
+    setupId: string
+    parameters: SetupParameters
     chunks: LockedChunkData[]
+}
+
+export interface Ceremony {
     contributorIds: string[]
     verifierIds: string[]
     attestations: Attestation[]
+    setups: Setup[]
     version: number
     round: number
     maxLocks: number

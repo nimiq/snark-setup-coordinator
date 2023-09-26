@@ -6,7 +6,7 @@ import os from 'os'
 import tmp from 'tmp'
 import { PassThrough } from 'stream'
 
-import { ChunkData, CeremonyParameters } from './ceremony'
+import { ChunkData, SetupParameters } from './ceremony'
 import { logger, logFile } from './logger'
 import { ContributionData } from './contribution-data'
 import { VerificationData } from './verification-data'
@@ -91,7 +91,7 @@ abstract class Powersoftau {
         parameters,
         contributorCommand,
     }: {
-        parameters: CeremonyParameters
+        parameters: SetupParameters
         contributorCommand: string
     }) {
         this.contributorCommand = contributorCommand
@@ -140,7 +140,7 @@ export class PowersoftauNew extends Powersoftau {
         contributorCommand,
     }: {
         seedFile: string
-        parameters: CeremonyParameters
+        parameters: SetupParameters
         contributorCommand: string
     }) {
         super({ parameters, contributorCommand })
@@ -184,7 +184,7 @@ export class ShellVerifier extends Powersoftau implements ShellCommand {
         contributorCommand,
     }: {
         chunkData: ChunkData
-        parameters: CeremonyParameters
+        parameters: SetupParameters
         contributorCommand: string
     }) {
         super({ parameters, contributorCommand })
@@ -304,7 +304,7 @@ export class ShellContributor extends Powersoftau implements ShellCommand {
         seedFile,
     }: {
         chunkData: ChunkData
-        parameters: CeremonyParameters
+        parameters: SetupParameters
         contributorCommand: string
         seedFile: string
     }) {

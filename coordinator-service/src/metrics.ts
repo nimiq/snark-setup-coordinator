@@ -41,8 +41,10 @@ export function initMetrics({
     })
     collectors.push(
         function collect(): void {
-            for (const chunk of ceremony.chunks) {
-                this.set({ chunkId: chunk.chunkId }, chunk.lockHolder ? 1 : 0)
+            for (const setup of ceremony.setups) {
+                for (const chunk of setup.chunks) {
+                    this.set({ chunkId: chunk.chunkId }, chunk.lockHolder ? 1 : 0)
+                }
             }
         }.bind(ceremonyLockInfo),
     )
@@ -55,9 +57,11 @@ export function initMetrics({
     })
     collectors.push(
         function collect(): void {
-            for (const chunk of ceremony.chunks) {
-                const date = new Date(chunk.metadata.lockHolderTime)
-                this.set({ chunkId: chunk.chunkId }, date.valueOf())
+            for (const setup of ceremony.setups) {
+                for (const chunk of setup.chunks) {
+                    const date = new Date(chunk.metadata.lockHolderTime)
+                    this.set({ chunkId: chunk.chunkId }, date.valueOf())
+                }
             }
         }.bind(ceremonyLockTimestamp),
     )

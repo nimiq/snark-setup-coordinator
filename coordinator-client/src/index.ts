@@ -13,7 +13,7 @@ import {
     ShellVerifier,
 } from './shell-contributor'
 import { CeremonyContributor, CeremonyVerifier } from './ceremony-participant'
-import { LockedChunkData, ChunkData, CeremonyParameters } from './ceremony'
+import { LockedChunkData, ChunkData, SetupParameters } from './ceremony'
 import { DefaultChunkUploader } from './chunk-uploader'
 import { AuthCelo } from './auth-celo'
 import { AuthDummy } from './auth-dummy'
@@ -66,7 +66,7 @@ async function contribute({
         chunkUploader,
     })
     const contributor = (
-        parameters: CeremonyParameters,
+        parameters: SetupParameters,
         chunkData: ChunkData,
     ): ShellContributor => {
         return new ShellContributor({
@@ -100,7 +100,7 @@ async function verify({
     })
 
     const contributor = (
-        parameters: CeremonyParameters,
+        parameters: SetupParameters,
         chunkData: ChunkData,
     ): ShellVerifier => {
         return new ShellVerifier({
@@ -136,76 +136,81 @@ async function newChallenge({
         chunkUploader,
     })
     const ceremony = await client.getCeremony()
-
-    const powersoftauNew = new PowersoftauNew({
-        parameters: ceremony.parameters,
-        contributorCommand: command,
-        seedFile: seedFile,
-    })
-    const round = 0
-
-    const chunks = []
-    for (let chunkIndex = 0; chunkIndex < count; chunkIndex++) {
-        logger.info(`creating challenge ${chunkIndex + 1} of ${count}`)
-        const contributionPath = tmp.tmpNameSync()
-        const newChallengeHashPath = tmp.tmpNameSync()
-        await powersoftauNew.run({
-            chunkIndex,
-            contributionPath,
-            newChallengeHashPath,
+    for (const setup of ceremony.setups) {
+        const parameters = setup.parameters
+        const setupId = setup.setupId
+        const powersoftauNew = new PowersoftauNew({
+            parameters,
+            contributorCommand: command,
+            seedFile: seedFile,
         })
-        const newChallengeHash = fs
-            .readFileSync(newChallengeHashPath)
-            .toString('hex')
+        const round = 0
 
-        const url = `${apiUrl}/chunks/${round}/${chunkIndex}/contribution/0`
-        await chunkUploader.upload({
-            url,
-            content: fs.readFileSync(contributionPath),
-        })
-        logger.info('uploaded %s', url)
-        logger.info('hash for chunk %d: %s', chunkIndex, newChallengeHash)
+        const chunks = []
+        for (let chunkIndex = 0; chunkIndex < count; chunkIndex++) {
+            logger.info(`creating challenge ${chunkIndex + 1} of ${count}`)
+            const contributionPath = tmp.tmpNameSync()
+            const newChallengeHashPath = tmp.tmpNameSync()
+            await powersoftauNew.run({
+                chunkIndex,
+                contributionPath,
+                newChallengeHashPath,
+            })
+            const newChallengeHash = fs
+                .readFileSync(newChallengeHashPath)
+                .toString('hex')
 
-        fs.unlinkSync(contributionPath)
-        fs.unlinkSync(newChallengeHashPath)
-        const chunk: LockedChunkData = {
-            chunkId: chunkIndex.toString(),
-            lockHolder: null,
-            contributions: [
-                {
-                    contributorId: null,
-                    contributedLocation: null,
-                    verifierId: participantId,
-                    verifiedLocation: url,
-                    verified: true,
-                    verifiedData: {
-                        data: {
-                            challengeHash:
+            const url = `${apiUrl}/chunks/${round}/${setupId}${chunkIndex}/contribution/0`
+            await chunkUploader.upload({
+                url,
+                content: fs.readFileSync(contributionPath),
+            })
+            logger.info('uploaded %s', url)
+            logger.info('hash for chunk %d: %s', chunkIndex, newChallengeHash)
+
+            fs.unlinkSync(contributionPath)
+            fs.unlinkSync(newChallengeHashPath)
+            const chunk: LockedChunkData = {
+                setupId,
+                parameters,
+                chunkId: chunkIndex.toString(),
+                lockHolder: null,
+                contributions: [
+                    {
+                        contributorId: null,
+                        contributedLocation: null,
+                        verifierId: participantId,
+                        verifiedLocation: url,
+                        verified: true,
+                        verifiedData: {
+                            data: {
+                                challengeHash:
+                                    '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+                                responseHash:
+                                    '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+                                newChallengeHash,
+                            },
+                            // Nimiq signatures are only 128 characters in hex
+                            signature:
                                 '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-                            responseHash:
-                                '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-                            newChallengeHash,
                         },
-                        // Nimiq signatures are only 128 characters in hex
-                        signature:
-                            '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+                        metadata: {
+                            contributedTime: null,
+                            contributedLockHolderTime: null,
+                            verifiedTime: null,
+                            verifiedLockHolderTime: null,
+                        },
+                        contributedData: null,
                     },
-                    metadata: {
-                        contributedTime: null,
-                        contributedLockHolderTime: null,
-                        verifiedTime: null,
-                        verifiedLockHolderTime: null,
-                    },
-                    contributedData: null,
+                ],
+                metadata: {
+                    lockHolderTime: null,
                 },
-            ],
-            metadata: {
-                lockHolderTime: null,
-            },
+            }
+            chunks.push(chunk)
         }
-        chunks.push(chunk)
+        logger.info('new chunks: %s', JSON.stringify(chunks, null, 2))
     }
-    logger.info('new chunks: %s', JSON.stringify(chunks, null, 2))
 }
 
 async function httpAuth({
@@ -325,7 +330,7 @@ async function main(): Promise<void> {
             ...participateArgs,
             ...powersoftauArgs,
         })
-        .command('new', 'Create new challenges for a ceremony', {
+        .command('new', 'Create new challenges for a setup', {
             ...participateArgs,
             ...powersoftauArgs,
             count: {

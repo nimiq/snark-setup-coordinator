@@ -1,6 +1,6 @@
 import fs from 'fs'
 import ora from 'ora'
-import { ChunkData, CeremonyParameters } from './ceremony'
+import { ChunkData, SetupParameters } from './ceremony'
 import { CeremonyParticipant } from './ceremony-participant'
 import { ShellCommand } from './shell-contributor'
 import { logger } from './logger'
@@ -16,31 +16,35 @@ export async function worker({
 }: {
     client: CeremonyParticipant
     contributor: (
-        parameters: CeremonyParameters,
+        parameters: SetupParameters,
         chunk: ChunkData,
     ) => ShellCommand
 }): Promise<void> {
     const ui = ora('Starting to contribute...').start()
     const lockBackoffMsecs = 5000
+    const ceremony = await client.getCeremony()
+
 
     let incompleteChunks = await client.getChunksRemaining()
     while (incompleteChunks.length) {
-        const ceremony = await client.getCeremony()
+        const chunk = await client.getLockedChunk()
+        const parameters = chunk.parameters
+        const setupId = chunk.setupId
+        const chunks_length = CeremonyParticipant._getSetup(ceremony, setupId).chunks.length
         const completedChunkCount =
-            ceremony.chunks.length - incompleteChunks.length
+            chunks_length - incompleteChunks.length
         const remainingChunkIds = incompleteChunks.map((chunk) => chunk.chunkId)
         logger.info(
-            `completed ${completedChunkCount} / ${ceremony.chunks.length}`,
+            `completed ${completedChunkCount} / ${chunks_length}`,
         )
-        ui.text = `Waiting for an available chunk... Completed ${completedChunkCount} / ${ceremony.chunks.length}`
+        ui.text = `Waiting for an available chunk... Completed ${completedChunkCount} / ${chunks_length}`
         logger.info(`incomplete chunks: %o`, remainingChunkIds)
-        const chunk = await client.getLockedChunk()
         if (chunk) {
-            ui.text = `Contributing to chunk ${chunk.chunkId}... Completed ${completedChunkCount} / ${ceremony.chunks.length}`
+            ui.text = `Contributing to chunk ${chunk.chunkId}... Completed ${completedChunkCount} / ${chunks_length}`
             logger.info(`locked chunk ${chunk.chunkId}`)
             try {
                 // TODO: pull up out of if and handle errors
-                const contribute = contributor(ceremony.parameters, chunk)
+                const contribute = contributor(parameters, chunk)
                 await contribute.load()
 
                 const { contributionPath, result } = await contribute.run()
@@ -59,6 +63,7 @@ export async function worker({
                 )
                 const content = fs.readFileSync(contributionPath)
                 await client.contributeChunk({
+                    setupId,
                     chunkId: chunk.chunkId,
                     content,
                     signedData: signedContributionData,

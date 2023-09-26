@@ -32,8 +32,8 @@ export class BlobChunkStorage implements ChunkStorage {
         return this.containerClient.url
     }
 
-    static _blobName(round, chunkId, version, participantId, suffix): string {
-        return `${round}.${chunkId}.${version}.${participantId}${suffix}`
+    static _blobName(round, setupId, chunkId, version, participantId, suffix): string {
+        return `${round}.${setupId}.${chunkId}.${version}.${participantId}${suffix}`
     }
 
     getChunkWriteLocation({
@@ -45,11 +45,13 @@ export class BlobChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): string {
+        const setupId = chunk.setupId
         const chunkId = chunk.chunkId
         const version = chunkVersion(chunk)
 
         const blobName = BlobChunkStorage._blobName(
             round,
+            setupId,
             chunkId,
             version,
             participantId,
@@ -80,10 +82,12 @@ export class BlobChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): Promise<string> {
+        const setupId = chunk.setupId
         const chunkId = chunk.chunkId
         const version = chunkVersion(chunk)
         const sourceBlobName = BlobChunkStorage._blobName(
             round,
+            setupId,
             chunkId,
             version,
             participantId,
@@ -92,6 +96,7 @@ export class BlobChunkStorage implements ChunkStorage {
         const sourceUrl = `${this._baseUrl()}/${sourceBlobName}`
         const destinationBlobName = BlobChunkStorage._blobName(
             round,
+            setupId,
             chunkId,
             version,
             participantId,

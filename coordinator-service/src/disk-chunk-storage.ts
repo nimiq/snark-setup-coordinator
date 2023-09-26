@@ -28,9 +28,10 @@ export class DiskChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): string {
+        const setupId = chunk.setupId
         const chunkId = chunk.chunkId
         const version = chunkVersion(chunk)
-        const path = `/${round}/${chunkId}/contribution/${version}`
+        const path = `/${round}/${setupId}-${chunkId}/contribution/${version}`
         return `${this.chunkStorageUrl}${path}`
     }
 
@@ -49,21 +50,22 @@ export class DiskChunkStorage implements ChunkStorage {
 
     setChunk(
         round: number,
+        setupId: string,
         chunkId: string,
         version: string,
         content: Buffer,
     ): void {
         const contentPath = path.join(
             this.storagePath,
-            `${round}.${chunkId}.${version}`,
+            `${round}.${setupId}-${chunkId}.${version}`,
         )
         fs.writeFileSync(contentPath, content)
     }
 
-    getChunk(round: number, chunkId: string, version: string): Buffer {
+    getChunk(round: number, setupId: string, chunkId: string, version: string): Buffer {
         const contentPath = path.join(
             this.storagePath,
-            `${round}.${chunkId}.${version}`,
+            `${round}.${setupId}-${chunkId}.${version}`,
         )
         return fs.readFileSync(contentPath)
     }

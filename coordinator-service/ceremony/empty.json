@@ -5,14 +5,19 @@
   "shutdownSignal": false,
   "contributorIds": [],
   "verifierIds": [],
-  "chunks": [],
   "attestations": [],
-  "parameters": {
-    "provingSystem": "groth16",
-    "curveKind": "bw6",
-    "chunkSize": 1024,
-    "batchSize": 1024,
-    "power": 12
-  },
+  "setups": [
+    {
+      "setupId": "0",
+      "parameters": {
+        "provingSystem": "groth16",
+        "curveKind": "bw6",
+        "chunkSize": 1024,
+        "batchSize": 1024,
+        "power": 12
+      },
+      "chunks": []
+    }
+  ],
   "phase": "phase1"
 }

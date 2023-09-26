@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios'
 import shuffle = require('shuffle-array')
 
 import { Auth } from './auth'
-import { ChunkData, LockedChunkData, Ceremony } from './ceremony'
+import { ChunkData, LockedChunkData, Ceremony, Setup } from './ceremony'
 import { ChunkUploader } from './chunk-uploader'
 import { logger } from './logger'
 import { SignedData } from './signed-data'
@@ -54,9 +54,9 @@ export abstract class CeremonyParticipant {
         ).data.result as Ceremony
     }
 
-    async tryLock(chunkId: string): Promise<boolean> {
+    async tryLock(setupId: string, chunkId: string): Promise<boolean> {
         const method = 'POST'
-        const path = `/chunks/${chunkId}/lock`
+        const path = `/chunks/${setupId}-${chunkId}/lock`
         return (
             await this.axios({
                 method,
@@ -86,7 +86,7 @@ export abstract class CeremonyParticipant {
         // Shuffle to mitigate thundering herd problems.
         shuffle(unlockedChunks)
         for (const chunk of unlockedChunks) {
-            const locked = await this.tryLock(chunk.chunkId)
+            const locked = await this.tryLock(chunk.setupId, chunk.chunkId)
             if (locked) {
                 return chunk
             }
@@ -95,16 +95,18 @@ export abstract class CeremonyParticipant {
     }
 
     async contributeChunk({
+        setupId,
         chunkId,
         content,
         signedData,
     }: {
+        setupId: string
         chunkId: string
         content: Buffer
         signedData: SignedData
     }): Promise<void> {
         const destinationMethod = 'GET'
-        const destinationPath = `/chunks/${chunkId}/contribution`
+        const destinationPath = `/chunks/${setupId}-${chunkId}/contribution`
         const writeUrl = (
             await this.axios({
                 method: destinationMethod,
@@ -121,7 +123,7 @@ export abstract class CeremonyParticipant {
         await this.chunkUploader.upload({ url: writeUrl, content })
 
         const contributeMethod = 'POST'
-        const contributePath = `/chunks/${chunkId}/contribution`
+        const contributePath = `/chunks/${setupId}-${chunkId}/contribution`
         await this.axios({
             method: contributeMethod,
             url: contributePath,
@@ -134,83 +136,108 @@ export abstract class CeremonyParticipant {
             },
         })
     }
+
+    static _getSetup(ceremony: Ceremony, setupId: string): Setup {
+        const setup = ceremony.setups.find((setup) => setup.setupId == setupId)
+        if (!setup) {
+            throw new Error(`Unknown setupId ${setupId}`)
+        }
+        return setup
+    }
 }
 
 export class CeremonyContributor extends CeremonyParticipant {
     async getChunksRemaining(): Promise<LockedChunkData[]> {
         const ceremony = await this.getCeremony()
-        return ceremony.chunks.filter((chunk) => {
-            //
-            // Any chunk this.participantId hasn't contribute to.
-            //
-            return !chunk.contributions.find((contribution) => {
-                return contribution.contributorId === this.participantId
-            })
-        })
+        let chunks = []
+        for (const setup of ceremony.setups) {
+            chunks.concat(setup.chunks.filter((chunk) => {
+
+                //
+                // Any chunk this.participantId hasn't contribute to.
+                //
+                return !chunk.contributions.find((contribution) => {
+                    return contribution.contributorId === this.participantId
+                })
+            }))
+        }
+        return chunks
     }
 
     async getChunksAcceptingContributions(): Promise<LockedChunkData[]> {
         const ceremony = await this.getCeremony()
-        return ceremony.chunks.filter((chunk) => {
-            const contributions = chunk.contributions
-            if (!contributions.length) {
-                logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
-                return false
-            }
-            //
-            // Chunks with the last contribution verified and that this.participantId
-            // hasn't contributed to.
-            //
-            const lastContribution = contributions[contributions.length - 1]
-            if (!lastContribution.verified) {
-                return false
-            }
-            return !chunk.contributions.find((contribution) => {
-                return contribution.contributorId === this.participantId
-            })
-        })
+        let chunks = []
+        for (const setup of ceremony.setups) {
+            chunks.concat(setup.chunks.filter((chunk) => {
+                const contributions = chunk.contributions
+                if (!contributions.length) {
+                    logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
+                    return false
+                }
+                //
+                // Chunks with the last contribution verified and that this.participantId
+                // hasn't contributed to.
+                //
+                const lastContribution = contributions[contributions.length - 1]
+                if (!lastContribution.verified) {
+                    return false
+                }
+                return !chunk.contributions.find((contribution) => {
+                    return contribution.contributorId === this.participantId
+                })
+            }))
+        }
+        return chunks
     }
 }
 
 export class CeremonyVerifier extends CeremonyParticipant {
     async getChunksRemaining(): Promise<LockedChunkData[]> {
         const ceremony = await this.getCeremony()
-        return ceremony.chunks.filter((chunk) => {
-            const contributions = chunk.contributions
-            if (!contributions.length) {
-                logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
-                return false
-            }
-            //
-            // Chunks with unverified contributions or missing contributions from
-            // participants.
-            //
-            const lastContribution = contributions[contributions.length - 1]
-            if (!lastContribution.verified) {
-                return true
-            }
-            const contributorIds = contributions
-                .filter((contribution) => contribution.contributorId)
-                .map((contribution) => contribution.contributorId)
-            return !ceremony.contributorIds.every((particpantsId) =>
-                contributorIds.includes(particpantsId),
-            )
-        })
+        let chunks = []
+        for (const setup of ceremony.setups) {
+            chunks.concat(setup.chunks.filter((chunk) => {
+                const contributions = chunk.contributions
+                if (!contributions.length) {
+                    logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
+                    return false
+                }
+                //
+                // Chunks with unverified contributions or missing contributions from
+                // participants.
+                //
+                const lastContribution = contributions[contributions.length - 1]
+                if (!lastContribution.verified) {
+                    return true
+                }
+                const contributorIds = contributions
+                    .filter((contribution) => contribution.contributorId)
+                    .map((contribution) => contribution.contributorId)
+                return !ceremony.contributorIds.every((particpantsId) =>
+                    contributorIds.includes(particpantsId),
+                )
+            }))
+        }
+        return chunks
     }
 
     async getChunksAcceptingContributions(): Promise<LockedChunkData[]> {
         const ceremony = await this.getCeremony()
-        return ceremony.chunks.filter((chunk) => {
-            const contributions = chunk.contributions
-            if (!contributions.length) {
-                logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
-                return false
-            }
-            //
-            // Chunks with the last contribution unverified
-            //
-            const lastContribution = contributions[contributions.length - 1]
-            return !lastContribution.verified
-        })
+        let chunks = []
+        for (const setup of ceremony.setups) {
+            chunks.concat(setup.chunks.filter((chunk) => {
+                const contributions = chunk.contributions
+                if (!contributions.length) {
+                    logger.warn(`Missing contributions for chunk ${chunk.chunkId}`)
+                    return false
+                }
+                //
+                // Chunks with the last contribution unverified
+                //
+                const lastContribution = contributions[contributions.length - 1]
+                return !lastContribution.verified
+            }))
+        }
+        return chunks
     }
 }
