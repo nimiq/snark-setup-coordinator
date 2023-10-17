@@ -143,31 +143,37 @@ function http(args): void {
                 logger.debug(
                     `POST /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
                 )
-                diskChunkStorage.setChunk(round, chunkId, version, content)
+                diskChunkStorage.setChunk(round, { setupId, chunkId }, version, content)
                 res.json({ status: 'ok' })
             },
         )
-        app.get('/chunks/:round/:setupId-:chunkId/contribution/:version', (req, res) => {
-            const setupId = req.params.setupId
-            const chunkId = req.params.chunkId
-            const version = req.params.version
-            const round = parseInt(req.params.round)
+        app.get(
+            '/chunks/:round/:setupId-:chunkId/contribution/:version',
+            (req, res) => {
+                const setupId = req.params.setupId
+                const chunkId = req.params.chunkId
+                const version = req.params.version
+                const round = parseInt(req.params.round)
 
-            logger.debug(
-                `GET /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
-            )
-            try {
-                const content = diskChunkStorage.getChunk(
-                    round,
-                    chunkId,
-                    version,
+                logger.debug(
+                    `GET /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
                 )
-                res.status(200).send(content)
-            } catch (err) {
-                logger.warn(err.message)
-                res.status(500).json({ status: 'error', message: err.message })
-            }
-        })
+                try {
+                    const content = diskChunkStorage.getChunk(
+                        round,
+                        { setupId, chunkId },
+                        version,
+                    )
+                    res.status(200).send(content)
+                } catch (err) {
+                    logger.warn(err.message)
+                    res.status(500).json({
+                        status: 'error',
+                        message: err.message,
+                    })
+                }
+            },
+        )
     }
 
     app.listen(args.port, () => {

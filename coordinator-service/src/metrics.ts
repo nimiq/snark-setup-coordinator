@@ -36,14 +36,17 @@ export function initMetrics({
     const ceremonyLockInfo = new prometheus.Gauge({
         name: 'coordinator_ceremony_lock_info',
         help: 'The latest lock state',
-        labelNames: ['chunkId'],
+        labelNames: ['uniqueChunkId'],
         registers: [registry],
     })
     collectors.push(
         function collect(): void {
             for (const setup of ceremony.setups) {
                 for (const chunk of setup.chunks) {
-                    this.set({ chunkId: chunk.chunkId }, chunk.lockHolder ? 1 : 0)
+                    this.set(
+                        { uniqueChunkId: chunk.uniqueChunkId },
+                        chunk.lockHolder ? 1 : 0,
+                    )
                 }
             }
         }.bind(ceremonyLockInfo),
@@ -52,7 +55,7 @@ export function initMetrics({
     const ceremonyLockTimestamp = new prometheus.Gauge({
         name: 'coordinator_ceremony_lock_timestamp',
         help: 'The latest lock modification time',
-        labelNames: ['chunkId'],
+        labelNames: ['uniqueChunkId'],
         registers: [registry],
     })
     collectors.push(
@@ -60,7 +63,10 @@ export function initMetrics({
             for (const setup of ceremony.setups) {
                 for (const chunk of setup.chunks) {
                     const date = new Date(chunk.metadata.lockHolderTime)
-                    this.set({ chunkId: chunk.chunkId }, date.valueOf())
+                    this.set(
+                        { uniqueChunkId: chunk.uniqueChunkId },
+                        date.valueOf(),
+                    )
                 }
             }
         }.bind(ceremonyLockTimestamp),

@@ -28,33 +28,38 @@ describe('metrics', () => {
             version: 0,
             maxLocks: 1,
             shutdownSignal: false,
-            parameters: {},
             contributorIds: ['frank', 'becky'],
             verifierIds: ['verifier0'],
-            chunks: [
+            setups: [
                 {
-                    chunkId: '1',
-                    lockHolder: null,
-                    contributions: [
+                    setupId: '1',
+                    parameters: {},
+                    chunks: [
                         {
-                            contributorId: null,
-                            contributedLocation: null,
-                            verifiedLocation: '/some/location/1',
-                            verifierId: 'verifier0',
-                            verified: true,
+                            uniqueChunkId: { setupId: '1', chunkId: '1' },
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: null,
+                                    contributedLocation: null,
+                                    verifiedLocation: '/some/location/1',
+                                    verifierId: 'verifier0',
+                                    verified: true,
+                                },
+                            ],
                         },
-                    ],
-                },
-                {
-                    chunkId: '2',
-                    lockHolder: null,
-                    contributions: [
                         {
-                            contributorId: 'pat',
-                            contributedLocation: '/some/location/2',
-                            verifierId: null,
-                            verifiedLocation: null,
-                            verified: false,
+                            uniqueChunkId: { setupId: '1', chunkId: '2' },
+                            lockHolder: null,
+                            contributions: [
+                                {
+                                    contributorId: 'pat',
+                                    contributedLocation: '/some/location/2',
+                                    verifierId: null,
+                                    verifiedLocation: null,
+                                    verified: false,
+                                },
+                            ],
                         },
                     ],
                 },

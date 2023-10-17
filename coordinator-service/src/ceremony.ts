@@ -18,9 +18,8 @@ export interface ChunkContribution {
 }
 
 export interface ChunkData {
-    setupId: string
     parameters: SetupParameters
-    chunkId: string
+    uniqueChunkId: UniqueChunkId
     contributions: ChunkContribution[]
 }
 
@@ -31,6 +30,11 @@ export interface LockedChunkDataMetadata {
 export interface LockedChunkData extends ChunkData {
     metadata: LockedChunkDataMetadata
     lockHolder: string
+}
+
+export interface UniqueChunkId {
+    setupId: string
+    chunkId: string
 }
 
 export interface SetupParameters {

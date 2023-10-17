@@ -6,15 +6,17 @@ import {
     ChunkData,
     LockedChunkData,
     Attestation,
+    UniqueChunkId,
 } from './ceremony'
 
 export interface ChunkInfo {
-    chunkId: string
+    parameters: SetupParameters
+    uniqueChunkId: UniqueChunkId
     lockHolder: string
 }
 
 export interface ChunkDownloadInfo {
-    chunkId: string
+    uniqueChunkId: UniqueChunkId
     lockHolder: string
     lastResponseUrl: string
     lastChallengeUrl: string
@@ -24,11 +26,9 @@ export interface ChunkDownloadInfo {
 export interface Coordinator {
     getCeremony(): ReadonlyCeremony
     setCeremony(ceremony: Ceremony): void
-    setSetup(version: number, newSetup: Setup): void
-    deleteLastSetup(): void
     getParameters(setupId: string): SetupParameters
     getNumNonContributedChunks(setupId: string, contributorId: string): number
-    getLockedChunks(setupId: string, participantId: string): string[]
+    getLockedChunks(setupId: string, participantId: string): UniqueChunkId[]
     addAttestation(attest: Attestation, participantId: string): void
     getContributorChunks(setupId: string, participantId: string): ChunkInfo[]
     getVerifierChunks(setupId: string): ChunkInfo[]
@@ -37,20 +37,18 @@ export interface Coordinator {
     getShutdownSignal(): boolean
     setShutdownSignal(signal: boolean): void
     getRound(): number
-    getChunk(setupId: string, chunkId: string): LockedChunkData
-    getChunkDownloadInfo(setupId: string, chunkId: string): ChunkDownloadInfo
+    getChunk(uniqueChunkId: UniqueChunkId): LockedChunkData
+    getChunkDownloadInfo(uniqueChunkId: UniqueChunkId): ChunkDownloadInfo
     getPhase(): string
-    tryLockChunk(setupId: string, chunkId: string, participantId: string): boolean
-    tryUnlockChunk(setupId: string, chunkId: string, participantId: string): boolean
+    tryLockChunk(uniqueChunkId: UniqueChunkId, participantId: string): boolean
+    tryUnlockChunk(uniqueChunkId: UniqueChunkId, participantId: string): boolean
     contributeChunk({
-        setupId,
-        chunkId,
+        uniqueChunkId,
         participantId,
         location,
         signedData,
     }: {
-        setupId: string,
-        chunkId: string
+        uniqueChunkId: UniqueChunkId
         participantId: string
         location: string
         signedData: object
@@ -59,24 +57,20 @@ export interface Coordinator {
 
 export interface ChunkStorage {
     getChunkWriteLocation({
-        setupId,
         round,
         chunk,
         participantId,
     }: {
-        setupId: string,
         round: number
         chunk: ChunkData
         participantId: string
     })
 
-    copyChunk({
-        setupId,
+    moveChunk({
         round,
         chunk,
         participantId,
     }: {
-        setupId: string,
         round: number
         chunk: ChunkData
         participantId: string

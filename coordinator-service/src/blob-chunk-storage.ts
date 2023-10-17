@@ -32,7 +32,14 @@ export class BlobChunkStorage implements ChunkStorage {
         return this.containerClient.url
     }
 
-    static _blobName(round, setupId, chunkId, version, participantId, suffix): string {
+    static _blobName(
+        round,
+        setupId,
+        chunkId,
+        version,
+        participantId,
+        suffix,
+    ): string {
         return `${round}.${setupId}.${chunkId}.${version}.${participantId}${suffix}`
     }
 
@@ -45,8 +52,8 @@ export class BlobChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): string {
-        const setupId = chunk.setupId
-        const chunkId = chunk.chunkId
+        const setupId = chunk.uniqueChunkId.setupId
+        const chunkId = chunk.uniqueChunkId.chunkId
         const version = chunkVersion(chunk)
 
         const blobName = BlobChunkStorage._blobName(
@@ -73,7 +80,7 @@ export class BlobChunkStorage implements ChunkStorage {
         return `${this._baseUrl()}/${blobName}?${blobSAS}`
     }
 
-    async copyChunk({
+    async moveChunk({
         round,
         chunk,
         participantId,
@@ -82,8 +89,8 @@ export class BlobChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): Promise<string> {
-        const setupId = chunk.setupId
-        const chunkId = chunk.chunkId
+        const setupId = chunk.uniqueChunkId.setupId
+        const chunkId = chunk.uniqueChunkId.chunkId
         const version = chunkVersion(chunk)
         const sourceBlobName = BlobChunkStorage._blobName(
             round,
@@ -105,13 +112,25 @@ export class BlobChunkStorage implements ChunkStorage {
         const destinationClient = this.containerClient.getBlobClient(
             destinationBlobName,
         )
-        const abortSignal = AbortController.timeout(timeoutMilliseconds)
+        let abortSignal = AbortController.timeout(timeoutMilliseconds)
         const poller = await destinationClient.beginCopyFromURL(sourceUrl, {
             abortSignal,
         })
         const result = await poller.pollUntilDone()
         if (result.copyStatus !== 'success') {
             throw new Error(`Copy '${sourceUrl}' failed '${result.copyStatus}'`)
+        }
+
+        // Delete unsafe blob.
+        const sourceClient = this.containerClient.getBlobClient(sourceBlobName)
+        abortSignal = AbortController.timeout(timeoutMilliseconds)
+        const deleteResult = await sourceClient.deleteIfExists({
+            abortSignal,
+            deleteSnapshots: 'include',
+        })
+
+        if (!deleteResult.succeeded) {
+            console.error(`Delete '${sourceUrl}' failed`)
         }
 
         const destinationUrl = `${this._baseUrl()}/${destinationBlobName}`

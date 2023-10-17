@@ -10,6 +10,7 @@ import {
     ChunkData,
     LockedChunkData,
     ReadonlyCeremony,
+    UniqueChunkId,
 } from './ceremony'
 import { isContributorData } from './contribution-data'
 import { isVerificationData } from './verification-data'
@@ -65,33 +66,35 @@ export class DiskCoordinator implements Coordinator {
         logger.info('args %o', initialVerifiers)
         logger.info('config %o', config.verifierIds)
 
-        // Add parameters if they're falsy in the config
-        // config.parameters = config.parameters || {
-        //     provingSystem: 'groth16',
-        //     curveKind: 'bw6',
-        //     batchSize: 64,
-        //     chunkSize: 512,
-        //     power: 10,
-        // }
+        config.setups = config.setups || []
 
         // Add metadata fields if they're missing.
-        // for (const lockedChunk of config.chunks) {
-        //     lockedChunk.metadata = lockedChunk.metadata ?? {
-        //         lockHolderTime: null,
-        //     }
-        //     for (const contribution of lockedChunk.contributions) {
-        //         contribution.metadata = contribution.metadata ?? {
-        //             contributedTime: null,
-        //             contributedLockHolderTime: null,
-        //             contributedData: null,
-        //             verifiedTime: null,
-        //             verifiedLockHolderTime: null,
-        //             verifiedData: null,
-        //         }
-        //     }
-        // }
+        for (const setup of config.setups) {
+            for (const lockedChunk of setup.chunks) {
+                // Add parameters if they're falsy in the setup
+                setup.parameters = setup.parameters || {
+                    provingSystem: 'groth16',
+                    curveKind: 'bw6',
+                    batchSize: 64,
+                    chunkSize: 512,
+                    power: 10,
+                }
 
-        config.setups = config.setups || []
+                lockedChunk.metadata = lockedChunk.metadata ?? {
+                    lockHolderTime: null,
+                }
+                for (const contribution of lockedChunk.contributions) {
+                    contribution.metadata = contribution.metadata ?? {
+                        contributedTime: null,
+                        contributedLockHolderTime: null,
+                        contributedData: null,
+                        verifiedTime: null,
+                        verifiedLockHolderTime: null,
+                        verifiedData: null,
+                    }
+                }
+            }
+        }
 
         fs.writeFileSync(dbPath, JSON.stringify(config, null, 2))
     }
@@ -116,15 +119,16 @@ export class DiskCoordinator implements Coordinator {
 
     getNumNonContributedChunks(setupId: string, contributorId: string): number {
         const ceremony = this.db
-        return DiskCoordinator._getSetup(ceremony, setupId).chunks.filter((a) => !hasContributed(contributorId, a))
-            .length
+        return DiskCoordinator._getSetup(ceremony, setupId).chunks.filter(
+            (a) => !hasContributed(contributorId, a),
+        ).length
     }
 
-    getLockedChunks(setupId: string, contributorId: string): string[] {
+    getLockedChunks(setupId: string, contributorId: string): UniqueChunkId[] {
         const ceremony = this.db
-        return DiskCoordinator._getSetup(ceremony, setupId).chunks
-            .filter((a) => a.lockHolder == contributorId)
-            .map(({ chunkId }) => chunkId)
+        return DiskCoordinator._getSetup(ceremony, setupId)
+            .chunks.filter((a) => a.lockHolder == contributorId)
+            .map(({ uniqueChunkId }) => uniqueChunkId)
     }
 
     getPhase(): string {
@@ -147,24 +151,31 @@ export class DiskCoordinator implements Coordinator {
 
     getContributorChunks(setupId: string, contributorId: string): ChunkInfo[] {
         const ceremony = this.db
-        return DiskCoordinator._getSetup(ceremony, setupId).chunks
+        const setup = DiskCoordinator._getSetup(ceremony, setupId)
+
+        return setup.chunks
             .filter((a) => !hasContributed(contributorId, a) && isVerified(a))
-            .map(({ lockHolder, chunkId }) => {
+            .map(({ lockHolder, uniqueChunkId }) => {
                 return {
+                    parameters: setup.parameters,
+                    uniqueChunkId,
                     lockHolder,
-                    chunkId,
                 }
             })
     }
 
     getVerifierChunks(setupId: string): ChunkInfo[] {
         const ceremony = this.db
-        return DiskCoordinator._getSetup(ceremony, setupId).chunks
+        const setup = DiskCoordinator._getSetup(ceremony, setupId)
+
+        return setup.chunks
             .filter((a) => !isVerified(a))
-            .map(({ lockHolder, chunkId }) => {
+            .map(({ lockHolder, uniqueChunkId }) => {
                 return {
+                    setupId,
+                    parameters: setup.parameters,
+                    uniqueChunkId,
                     lockHolder,
-                    chunkId,
                 }
             })
     }
@@ -186,10 +197,22 @@ export class DiskCoordinator implements Coordinator {
         this._writeDb()
     }
 
-    static _getChunk(ceremony: Ceremony, setupId: string, chunkId: string): LockedChunkData {
-        const chunk = DiskCoordinator._getSetup(ceremony, setupId).chunks.find((chunk) => chunk.chunkId == chunkId)
+    static _getChunk(
+        ceremony: Ceremony,
+        uniqueChunkId: UniqueChunkId,
+    ): LockedChunkData {
+        const chunk = DiskCoordinator._getSetup(
+            ceremony,
+            uniqueChunkId.setupId,
+        ).chunks.find(
+            (chunk) =>
+                chunk.uniqueChunkId.chunkId == uniqueChunkId.chunkId &&
+                chunk.uniqueChunkId.setupId == uniqueChunkId.setupId,
+        )
         if (!chunk) {
-            throw new Error(`Unknown chunkId ${setupId}-${chunkId}`)
+            throw new Error(
+                `Unknown chunkId ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
+            )
         }
         return chunk
     }
@@ -212,42 +235,17 @@ export class DiskCoordinator implements Coordinator {
         this._writeDb()
     }
 
-    setSetup(newVersion: number, newSetup: Setup): void {
-        if (this.db.version !== newVersion) {
-            throw new Error(
-                `New setup is out of date: ${this.db.version} vs ${newVersion}`,
-            )
-        }
-
-        for (let i = 0; i < this.db.setups.length; i++) {
-            if (this.db.setups[i].setupId === newSetup.setupId) {
-                this.db.setups[this.db.setups.length] = clonedeep(newSetup)
-                this._writeDb()
-                return
-            }
-        }
-
-        this.db.setups.push(clonedeep(newSetup))
-        this._writeDb()
+    getChunk(uniqueChunkId: UniqueChunkId): LockedChunkData {
+        return clonedeep(DiskCoordinator._getChunk(this.db, uniqueChunkId))
     }
 
-    deleteLastSetup(): void {
-        this.db.setups.pop()
-        this._writeDb()
-    }
-
-    getChunk(setupId: string, chunkId: string): LockedChunkData {
-        return clonedeep(DiskCoordinator._getChunk(this.db, setupId, chunkId))
-    }
-
-    getChunkDownloadInfo(setupId: string, chunkId: string): ChunkDownloadInfo {
+    getChunkDownloadInfo(uniqueChunkId: UniqueChunkId): ChunkDownloadInfo {
         const { lockHolder, contributions } = DiskCoordinator._getChunk(
             this.db,
-            setupId,
-            chunkId,
+            uniqueChunkId,
         )
         return {
-            chunkId,
+            uniqueChunkId,
             lockHolder,
             lastResponseUrl:
                 contributions.length > 0
@@ -265,24 +263,25 @@ export class DiskCoordinator implements Coordinator {
         }
     }
 
-    tryLockChunk(setupId: string, chunkId: string, participantId: string): boolean {
-        const chunk = DiskCoordinator._getChunk(this.db, setupId, chunkId)
+    tryLockChunk(uniqueChunkId: UniqueChunkId, participantId: string): boolean {
+        const chunk = DiskCoordinator._getChunk(this.db, uniqueChunkId)
         if (chunk.lockHolder) {
             if (chunk.lockHolder == participantId) {
                 return false
             } else {
                 throw new Error(
-                    `${participantId} can't lock chunk ${setupId}-${chunkId} since it's already locked by ${chunk.lockHolder}`,
+                    `${participantId} can't lock chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} since it's already locked by ${chunk.lockHolder}`,
                 )
             }
         }
 
-        const holding = DiskCoordinator._getSetup(this.db, setupId).chunks.filter(
-            (chunk) => chunk.lockHolder === participantId,
-        )
+        const holding = DiskCoordinator._getSetup(
+            this.db,
+            uniqueChunkId.setupId,
+        ).chunks.filter((chunk) => chunk.lockHolder === participantId)
         if (holding.length >= this.db.maxLocks) {
             throw new Error(
-                `${participantId} already holds too many locks (${holding.length}) on chunk ${setupId}-${chunkId}`,
+                `${participantId} already holds too many locks (${holding.length}) on chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
             )
         }
 
@@ -294,14 +293,14 @@ export class DiskCoordinator implements Coordinator {
         const verifier = this.db.verifierIds.includes(participantId)
         if (!verifier && hasContributed(participantId, chunk)) {
             throw new Error(
-                `${participantId} can't lock chunk ${setupId}-${chunkId} since they already contributed to it`,
+                `${participantId} can't lock chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} since they already contributed to it`,
             )
         }
         const lastContribution =
             chunk.contributions[chunk.contributions.length - 1]
         if (lastContribution.verified === verifier) {
             throw new Error(
-                `${participantId} can't lock chunk ${setupId}-${chunkId} since it's either verified and they're a verifier or it's unverified and they're a contributor`,
+                `${participantId} can't lock chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} since it's either verified and they're a verifier or it's unverified and they're a contributor`,
             )
         }
 
@@ -311,11 +310,14 @@ export class DiskCoordinator implements Coordinator {
         return true
     }
 
-    tryUnlockChunk(setupId: string, chunkId: string, participantId: string): boolean {
-        const chunk = DiskCoordinator._getChunk(this.db, setupId, chunkId)
+    tryUnlockChunk(
+        uniqueChunkId: UniqueChunkId,
+        participantId: string,
+    ): boolean {
+        const chunk = DiskCoordinator._getChunk(this.db, uniqueChunkId)
         if (chunk.lockHolder !== participantId) {
             throw new Error(
-                `${participantId} does not hold lock on chunk ${setupId}-${chunkId}`,
+                `${participantId} does not hold lock on chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
             )
         }
 
@@ -326,23 +328,21 @@ export class DiskCoordinator implements Coordinator {
     }
 
     async contributeChunk({
-        setupId,
-        chunkId,
+        uniqueChunkId,
         participantId,
         location,
         signedData,
     }: {
-        setupId: string
-        chunkId: string
+        uniqueChunkId: UniqueChunkId
         participantId: string
         location: string
         signedData: object
     }): Promise<void> {
-        const chunk = DiskCoordinator._getChunk(this.db, setupId, chunkId)
+        const chunk = DiskCoordinator._getChunk(this.db, uniqueChunkId)
         if (chunk.lockHolder !== participantId) {
             throw new Error(
                 `Participant ${participantId} does not hold lock ` +
-                `on chunk ${setupId}-${chunkId}`,
+                `on chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
             )
         }
         const now = timestamp()
@@ -350,7 +350,8 @@ export class DiskCoordinator implements Coordinator {
         if (verifier) {
             if (!isVerificationData(signedData)) {
                 throw new Error(
-                    `Data for chunk ${setupId}-${chunkId} by participant ${participantId} is not valid verification data: ${JSON.stringify(
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
+                    } by participant ${participantId} is not valid verification data: ${JSON.stringify(
                         signedData,
                     )}`,
                 )
@@ -360,7 +361,8 @@ export class DiskCoordinator implements Coordinator {
             const contributorSignedData = contribution.contributedData
             if (!isContributorData(contributorSignedData)) {
                 throw new Error(
-                    `Data for chunk ${setupId}-${chunkId} by participant ${participantId} during verification is not valid contributor data: ${JSON.stringify(
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
+                    } by participant ${participantId} during verification is not valid contributor data: ${JSON.stringify(
                         contributorSignedData,
                     )}`,
                 )
@@ -370,7 +372,7 @@ export class DiskCoordinator implements Coordinator {
                 signedData.data.challengeHash
             ) {
                 throw new Error(
-                    `During verification for chunk ${setupId}-${chunkId} by participant ${participantId}, contribution and verification challenge hashes were different: ${contributorSignedData.data.challengeHash} != ${signedData.data.challengeHash}`,
+                    `During verification for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} by participant ${participantId}, contribution and verification challenge hashes were different: ${contributorSignedData.data.challengeHash} != ${signedData.data.challengeHash}`,
                 )
             }
             if (
@@ -378,7 +380,7 @@ export class DiskCoordinator implements Coordinator {
                 signedData.data.responseHash
             ) {
                 throw new Error(
-                    `During verification for chunk ${setupId}-${chunkId} by participant ${participantId}, contribution and verification response hashes were different: ${contributorSignedData.data.responseHash} != ${signedData.data.responseHash}`,
+                    `During verification for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} by participant ${participantId}, contribution and verification response hashes were different: ${contributorSignedData.data.responseHash} != ${signedData.data.responseHash}`,
                 )
             }
             contribution.verifierId = participantId
@@ -391,7 +393,8 @@ export class DiskCoordinator implements Coordinator {
         } else {
             if (!isContributorData(signedData)) {
                 throw new Error(
-                    `Data for chunk ${setupId}-${chunkId} by participant ${participantId} is not valid contributor data: ${JSON.stringify(
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
+                    } by participant ${participantId} is not valid contributor data: ${JSON.stringify(
                         signedData,
                     )}`,
                 )
@@ -402,7 +405,8 @@ export class DiskCoordinator implements Coordinator {
                 previousContribution.verifiedData
             if (!isVerificationData(previousVerificationSignedData)) {
                 throw new Error(
-                    `During contribution for chunk ${setupId}-${chunkId} by participant ${participantId}, data is not valid verification data: ${JSON.stringify(
+                    `During contribution for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
+                    } by participant ${participantId}, data is not valid verification data: ${JSON.stringify(
                         signedData,
                     )}`,
                 )
@@ -412,7 +416,7 @@ export class DiskCoordinator implements Coordinator {
                 previousVerificationSignedData.data.newChallengeHash
             ) {
                 throw new Error(
-                    `During contribution for chunk ${setupId}-${chunkId} by participant ${participantId}, contribution and verification challenge hashes were different: ${signedData.data.challengeHash} != ${previousVerificationSignedData.data.newChallengeHash}`,
+                    `During contribution for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId} by participant ${participantId}, contribution and verification challenge hashes were different: ${signedData.data.challengeHash} != ${previousVerificationSignedData.data.newChallengeHash}`,
                 )
             }
             chunk.contributions.push({

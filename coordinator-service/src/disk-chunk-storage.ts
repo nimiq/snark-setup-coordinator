@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 
 import { ChunkStorage, chunkVersion } from './coordinator'
-import { ChunkData } from './ceremony'
+import { ChunkData, UniqueChunkId } from './ceremony'
 
 export class DiskChunkStorage implements ChunkStorage {
     chunkStorageUrl: string
@@ -28,14 +28,14 @@ export class DiskChunkStorage implements ChunkStorage {
         chunk: ChunkData
         participantId: string
     }): string {
-        const setupId = chunk.setupId
-        const chunkId = chunk.chunkId
+        const setupId = chunk.uniqueChunkId.setupId
+        const chunkId = chunk.uniqueChunkId.chunkId
         const version = chunkVersion(chunk)
         const path = `/${round}/${setupId}-${chunkId}/contribution/${version}`
         return `${this.chunkStorageUrl}${path}`
     }
 
-    async copyChunk({
+    async moveChunk({
         round,
         chunk,
         participantId,
@@ -50,22 +50,25 @@ export class DiskChunkStorage implements ChunkStorage {
 
     setChunk(
         round: number,
-        setupId: string,
-        chunkId: string,
+        uniqueChunkId: UniqueChunkId,
         version: string,
         content: Buffer,
     ): void {
         const contentPath = path.join(
             this.storagePath,
-            `${round}.${setupId}-${chunkId}.${version}`,
+            `${round}.${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}.${version}`,
         )
         fs.writeFileSync(contentPath, content)
     }
 
-    getChunk(round: number, setupId: string, chunkId: string, version: string): Buffer {
+    getChunk(
+        round: number,
+        uniqueChunkId: UniqueChunkId,
+        version: string,
+    ): Buffer {
         const contentPath = path.join(
             this.storagePath,
-            `${round}.${setupId}-${chunkId}.${version}`,
+            `${round}.${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}.${version}`,
         )
         return fs.readFileSync(contentPath)
     }

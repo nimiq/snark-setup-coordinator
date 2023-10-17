@@ -11,7 +11,10 @@
     "attestations": [],
     "chunks": [
         {
-            "chunkId": "0",
+            "uniqueChunkId": {
+                "setupId": "0",
+                "chunkId": "0"
+            },
             "lockHolder": null,
             "contributions": [
                 {
@@ -32,7 +35,10 @@
             ]
         },
         {
-            "chunkId": "1",
+            "uniqueChunkId": {
+                "setupId": "0",
+                "chunkId": "1"
+            },
             "lockHolder": null,
             "contributions": [
                 {
@@ -53,7 +59,10 @@
             ]
         },
         {
-            "chunkId": "2",
+            "uniqueChunkId": {
+                "setupId": "0",
+                "chunkId": "2"
+            },
             "lockHolder": null,
             "contributions": [
                 {
@@ -74,7 +83,10 @@
             ]
         },
         {
-            "chunkId": "3",
+            "uniqueChunkId": {
+                "setupId": "0",
+                "chunkId": "3"
+            },
             "lockHolder": null,
             "contributions": [
                 {

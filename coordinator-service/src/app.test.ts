@@ -5,7 +5,7 @@ import tmp from 'tmp'
 
 import { AuthenticateDummy } from './authenticate-dummy'
 import { initExpress } from './app'
-import { Ceremony, Setup } from './ceremony'
+import { Ceremony } from './ceremony'
 import { DiskCoordinator } from './disk-coordinator'
 import { DiskChunkStorage } from './disk-chunk-storage'
 
@@ -52,15 +52,15 @@ describe('app', () => {
                 {
                     setupId: '1',
                     parameters: {
-                        "provingSystem": "groth16",
-                        "curveKind": "bw6",
-                        "chunkSize": 1024,
-                        "batchSize": 1024,
-                        "power": 12
+                        provingSystem: 'groth16',
+                        curveKind: 'bw6',
+                        chunkSize: 1024,
+                        batchSize: 1024,
+                        power: 12,
                     },
                     chunks: [
                         {
-                            chunkId: '1',
+                            uniqueChunkId: { setupId: '1', chunkId: '1' },
                             lockHolder: null,
                             contributions: [
                                 {
@@ -74,7 +74,7 @@ describe('app', () => {
                             ],
                         },
                         {
-                            chunkId: '2',
+                            uniqueChunkId: { setupId: '1', chunkId: '2' },
                             lockHolder: null,
                             contributions: [
                                 {
@@ -88,7 +88,7 @@ describe('app', () => {
                             ],
                         },
                         {
-                            chunkId: '3',
+                            uniqueChunkId: { setupId: '1', chunkId: '3' },
                             lockHolder: null,
                             contributions: [
                                 {
@@ -102,7 +102,7 @@ describe('app', () => {
                             ],
                         },
                         {
-                            chunkId: '4',
+                            uniqueChunkId: { setupId: '1', chunkId: '4' },
                             lockHolder: null,
                             contributions: [
                                 {
@@ -124,7 +124,7 @@ describe('app', () => {
                             ],
                         },
                     ],
-                }
+                },
             ],
         }
 
@@ -149,29 +149,19 @@ describe('app', () => {
         })
     })
 
-    describe('PUT /setup', () => {
-        it('updates setup', async () => {
+    describe('PUT /ceremony', () => {
+        it('updates ceremony', async () => {
             let res
 
             res = await chai.request(app).get('/ceremony')
             expect(res).to.have.status(200)
 
             const newCeremony = res.body.result
-            newCeremony.setups[0] = {
-                "setupId": "0",
-                "parameters": {
-                    "provingSystem": "groth16",
-                    "curveKind": "bw6",
-                    "chunkSize": 1024,
-                    "batchSize": 1024,
-                    "power": 12
-                },
-                "chunks": []
-            }
+            newCeremony.setups[0].chunks[0].lockHolder = 'pat'
 
             res = await chai
                 .request(app)
-                .put('/setup')
+                .put('/ceremony')
                 .set('authorization', 'dummy verifier0')
                 .send(newCeremony)
             expect(res).to.have.status(200)
@@ -180,7 +170,7 @@ describe('app', () => {
             expect(res).to.have.status(200)
 
             newCeremony.version = 1
-            expect(res.body.result).to.deep.equal(newCeremony.setups)
+            expect(res.body.result).to.deep.equal(newCeremony)
         })
 
         it('rejects invalid versions', async () => {
@@ -192,7 +182,7 @@ describe('app', () => {
             const originalCeremony = res.body.result
             const newCeremony = JSON.parse(JSON.stringify(res.body.result))
             newCeremony.version = 9999
-            newCeremony.chunks[0].lockHolder = 'pat'
+            newCeremony.setups[0].chunks[0].lockHolder = 'pat'
 
             res = await chai
                 .request(app)
@@ -207,16 +197,26 @@ describe('app', () => {
         })
     })
 
-    describe('GET /contributor/:setupId-:chunkId/chunks', () => {
+    describe('GET /contributor/:participantId/chunks', () => {
         it('matches ceremony', async () => {
             const res = await chai.request(app).get('/contributor/pat/chunks')
             expect(res).to.have.status(200)
             const expected = {
-                setupId: '1',
-                chunks: [{ lockHolder: null, chunkId: '1' }],
+                chunks: [
+                    {
+                        lockHolder: null,
+                        uniqueChunkId: { setupId: '1', chunkId: '1' },
+                        parameters: {
+                            batchSize: 1024,
+                            chunkSize: 1024,
+                            curveKind: 'bw6',
+                            power: 12,
+                            provingSystem: 'groth16',
+                        },
+                    },
+                ],
                 lockedChunks: [],
                 numNonContributed: 1,
-                parameters: {},
                 numChunks: 4,
                 maxLocks: 1,
                 shutdownSignal: false,
@@ -238,8 +238,7 @@ describe('app', () => {
             const res = await chai.request(app).get('/chunks/1-1/info')
             expect(res).to.have.status(200)
             const expected = {
-                setupId: '1',
-                chunkId: '1',
+                uniqueChunkId: { setupId: '1', chunkId: '1' },
                 lockHolder: null,
                 lastResponseUrl: null,
                 lastChallengeUrl: '/some/location/1',
@@ -251,8 +250,7 @@ describe('app', () => {
             const res = await chai.request(app).get('/chunks/1-2/info')
             expect(res).to.have.status(200)
             const expected = {
-                setupId: '1',
-                chunkId: '2',
+                uniqueChunkId: { setupId: '1', chunkId: '2' },
                 lockHolder: null,
                 lastResponseUrl: '/some/location/2',
                 lastChallengeUrl: null,
@@ -264,8 +262,7 @@ describe('app', () => {
             const res = await chai.request(app).get('/chunks/1-4/info')
             expect(res).to.have.status(200)
             const expected = {
-                setupId: '1',
-                chunkId: '4',
+                uniqueChunkId: { setupId: '1', chunkId: '4' },
                 lockHolder: null,
                 lastResponseUrl: '/some/location/234',
                 lastChallengeUrl: null,
@@ -286,15 +283,17 @@ describe('app', () => {
                 .post('/chunks/1-1/lock')
                 .set('authorization', 'dummy frank')
             expect(res).to.have.status(200)
-            expect(res.body.result.chunkId).to.equal('1')
-            expect(res.body.result.setupId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             const resInfo = await chai
                 .request(app)
                 .get('/contributor/frank/chunks')
             expect(resInfo).to.have.status(200)
-            expect(resInfo.body.result.lockedChunks).to.deep.equal(['1'])
+            expect(resInfo.body.result.lockedChunks).to.deep.equal([
+                { setupId: '1', chunkId: '1' },
+            ])
         })
 
         it('returns false if lock holder tries another lock', async () => {
@@ -386,8 +385,8 @@ describe('app', () => {
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
-            expect(res.body.result.chunkId).to.equal('1')
-            expect(res.body.result.setupId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
@@ -396,8 +395,8 @@ describe('app', () => {
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
-            expect(res.body.result.chunkId).to.equal('1')
-            expect(res.body.result.setupId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.unlocked).to.equal(true)
         })
 
@@ -419,8 +418,8 @@ describe('app', () => {
                 .set('authorization', 'dummy frank')
                 .send({})
             expect(res).to.have.status(200)
-            expect(res.body.result.chunkId).to.equal('1')
-            expect(res.body.result.setupId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.locked).to.equal(true)
 
             res = await chai
@@ -429,8 +428,8 @@ describe('app', () => {
                 .set('authorization', 'dummy frank')
                 .send({ error: 'stuff' })
             expect(res).to.have.status(200)
-            expect(res.body.result.chunkId).to.equal('1')
-            expect(res.body.result.setupId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.unlocked).to.equal(true)
             expect(res.body.result.error).to.equal('stuff')
         })
@@ -510,7 +509,9 @@ describe('app', () => {
                 await chai.request(app).get('/ceremony')
             ).body.result
 
-            const chunk = ceremony.setups.find((setup) => setup.setupId === setupId).chunks.find((chunk) => chunk.chunkId === '1')
+            const chunk = ceremony.setups
+                .find((setup) => setup.setupId === setupId)
+                .chunks.find((chunk) => chunk.uniqueChunkId.chunkId === '1')
             expect(chunk.lockHolder).to.equal(null)
             const lockHolderTime = new Date(chunk.metadata.lockHolderTime)
             expect(lockHolderTime).to.be.greaterThan(new Date(null))
@@ -574,7 +575,9 @@ describe('app', () => {
             const ceremony: Ceremony = (
                 await chai.request(app).get('/ceremony')
             ).body.result
-            const chunk = ceremony.setups.find((setup) => setup.setupId === setupId).chunks.find((chunk) => chunk.chunkId === '2')
+            const chunk = ceremony.setups
+                .find((setup) => setup.setupId === setupId)
+                .chunks.find((chunk) => chunk.uniqueChunkId.chunkId === '2')
             const contribution =
                 chunk.contributions[chunk.contributions.length - 1]
             expect(contribution.verified).to.equal(true)

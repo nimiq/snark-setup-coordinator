@@ -26,7 +26,8 @@ describe('BlobChunkStorage', () => {
                 sharedKeyCredential,
             })
             const chunk = {
-                chunkId: 'chunkfoo',
+                uniqueChunkId: { setupId: 'setupfoo', chunkId: 'chunkfoo' },
+                parameters: null,
                 contributions: [
                     {
                         contributorId: null,
