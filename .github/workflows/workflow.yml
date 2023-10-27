@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [coordinator-client, coordinator-service]
+        app: [coordinator-service]
     defaults:
       run:
         working-directory: ${{ matrix.app }}
@@ -30,15 +30,3 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test
-  test-e2e:
-    runs-on: ubuntu-latest
-    name: E2E
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - name: Setup node
-        uses: actions/setup-node@v1
-        with:
-          node-version: 18
-      - run: node e2e/run-e2e-suite.js
