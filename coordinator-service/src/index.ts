@@ -143,7 +143,12 @@ function http(args): void {
                 logger.debug(
                     `POST /chunks/${round}/${setupId}-${chunkId}/contribution/${version}`,
                 )
-                diskChunkStorage.setChunk(round, { setupId, chunkId }, version, content)
+                diskChunkStorage.setChunk(
+                    round,
+                    { setupId, chunkId },
+                    version,
+                    content,
+                )
                 res.json({ status: 'ok' })
             },
         )
