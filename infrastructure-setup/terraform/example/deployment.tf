@@ -35,7 +35,7 @@ locals {
       password = "1"
     }
   ]
-  victorops_webhook_uri = "https://alert-mapping.victorops.com/integrations/azure/v1/<token>/Nimiq"
+  alerts_email_address = "<email>@<address>.com"
 }
 
 resource "azurerm_resource_group" "coordinator_group" {
@@ -87,7 +87,7 @@ module "deployment" {
   verifier_count                = length(local.verifier_credentials)
   resource_group_name           = local.resource_group_name
   log_analytics_workspace_name  = "${local.cluster_prefix}-workspace"
-  azure_monitor_alerts_webhook_uri = local.victorops_webhook_uri
+  azure_monitor_alerts_email_address = local.alerts_email_address
   depends_on                    = [azurerm_resource_group.coordinator_group]
 }
 

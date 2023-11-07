@@ -3,14 +3,14 @@ data "azurerm_log_analytics_workspace" "coordinator_workspace" {
   resource_group_name = data.azurerm_resource_group.existing.name
 }
 
-resource "azurerm_monitor_action_group" "victorops_group" {
-  name                = "CoordinatorVictorOps"
+resource "azurerm_monitor_action_group" "nimiqalerts_group" {
+  name                = "CoordinatorAlerts"
   resource_group_name = data.azurerm_resource_group.existing.name
-  short_name          = "NimiqVO"
+  short_name          = "NimiqA"
 
-  webhook_receiver {
-    name                    = "victorops"
-    service_uri             = var.azure_monitor_alerts_webhook_uri
+  email_receiver {
+    name                    = "alerts"
+    email_address             = var.azure_monitor_alerts_email_address
     use_common_alert_schema = true
   }
 }
@@ -21,7 +21,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "coordinator_warnings" {
   resource_group_name = data.azurerm_resource_group.existing.name
 
   action {
-    action_group           = [azurerm_monitor_action_group.victorops_group.id]
+    action_group           = [azurerm_monitor_action_group.nimiqalerts_group.id]
   }
 
   data_source_id = data.azurerm_log_analytics_workspace.coordinator_workspace.id
@@ -62,7 +62,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "coordinator_errors" {
   resource_group_name = data.azurerm_resource_group.existing.name
 
   action {
-    action_group           = [azurerm_monitor_action_group.victorops_group.id]
+    action_group           = [azurerm_monitor_action_group.nimiqalerts_group.id]
   }
 
   data_source_id = data.azurerm_log_analytics_workspace.coordinator_workspace.id

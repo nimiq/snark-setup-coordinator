@@ -78,7 +78,7 @@ variable "log_analytics_workspace_name" {
   description = "The name of the log analytics workspace to Alert on."
 }
 
-variable "azure_monitor_alerts_webhook_uri" {
+variable "azure_monitor_alerts_email_address" {
   type = string
-  description = "A webhook URL for Azure Monitor to send alerts to, like VictorOps or Slack."
+  description = "An email address for Azure Monitor to send alerts to."
 }
