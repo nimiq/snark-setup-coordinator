@@ -40,7 +40,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "coordinator_warnings" {
     (
         ContainerLog
         | where TimeGenerated > startTimestamp
-        | where LogEntry contains "WARNING"
+        | where LogEntry contains "WARN"
     )
     on ContainerID
     QUERY
@@ -90,6 +90,47 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "coordinator_errors" {
   frequency   = 5
   time_window = 5
   
+  trigger {
+    operator  = "GreaterThan"
+    threshold = 1
+  }
+}
+
+
+resource "azurerm_monitor_scheduled_query_rules_alert" "monitor_warnings" {
+  name                = "coordinator-error-${var.environment}-queryrule"
+  location            = data.azurerm_resource_group.existing.location
+  resource_group_name = data.azurerm_resource_group.existing.name
+
+  action {
+    action_group           = [azurerm_monitor_action_group.nimiqalerts_group.id]
+  }
+
+  data_source_id = data.azurerm_log_analytics_workspace.coordinator_workspace.id
+  description    = "Alert when nErrors > 1 in a 5 minute period."
+  enabled        = true
+
+  query       = <<-QUERY
+    let podPrefix = "monitor";
+    let startTimestamp = ago(5m);
+    KubePodInventory
+    | where TimeGenerated > startTimestamp
+    | project ContainerID, PodName=Name, PodLabel
+    | where PodName hasprefix podPrefix
+    | distinct ContainerID, PodName, PodLabel
+    | join
+    (
+        ContainerLog
+        | where TimeGenerated > startTimestamp
+        | where LogEntry contains "WARN"
+    )
+    on ContainerID
+    QUERY
+  
+  severity    = 3
+  frequency   = 5
+  time_window = 5
+
   trigger {
     operator  = "GreaterThan"
     threshold = 1
