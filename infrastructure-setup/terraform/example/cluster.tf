@@ -45,6 +45,7 @@ module "aks" {
   prefix              = local.cluster_prefix
   vnet_subnet_id      = module.network.vnet_subnets[0]
   os_disk_size_gb     = 50
+  agents_size         = "Standard_B4ms"
   agents_count        = 3
   role_based_access_control_enabled = true
   rbac_aad_azure_rbac_enabled = true

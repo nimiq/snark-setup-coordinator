@@ -34,6 +34,9 @@ spec:
             - name: secrets
               mountPath: "/secrets/"
               readOnly: true
+          resources:
+            requests:
+              cpu: "5"
       volumes:
         - name: db
           persistentVolumeClaim:
