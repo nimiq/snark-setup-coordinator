@@ -13,7 +13,19 @@ spec:
     metadata:
       labels:
         app: {{ tpl $.Values.coordinator.fullName . }}
+        cpuheavy: no
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: cpuheavy
+                  operator: In
+                  values:
+                  - yes
       containers:
         - image: {{ tpl $.Values.coordinator.image.full . }}
           imagePullPolicy: Always
@@ -34,9 +46,6 @@ spec:
             - name: secrets
               mountPath: "/secrets/"
               readOnly: true
-          resources:
-            requests:
-              cpu: "5"
       volumes:
         - name: db
           persistentVolumeClaim:

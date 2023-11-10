@@ -14,7 +14,19 @@ spec:
     metadata:
       labels:
         app: {{ tpl $.Values.participant.fullName $ }}-{{ $index }}
+        cpuheavy: yes
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: cpuheavy
+                  operator: In
+                  values:
+                  - no
       containers:
         - image: {{ tpl $.Values.participant.image.full $ }}
           imagePullPolicy: Always
@@ -31,9 +43,6 @@ spec:
             - name: secrets
               mountPath: "/secrets/"
               readOnly: true
-          resources:
-            requests:
-              cpu: "4"
       volumes:
         - name: secrets
           secret:
