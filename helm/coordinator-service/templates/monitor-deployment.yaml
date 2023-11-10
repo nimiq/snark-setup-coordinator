@@ -8,11 +8,24 @@ spec:
   selector:
     matchLabels:
       app: {{ tpl $.Values.monitor.fullName $ }}
+      cpuheavy: "no"
   template:
     metadata:
       labels:
         app: {{ tpl $.Values.monitor.fullName $ }}
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: cpuheavy
+                  operator: In
+                  values:
+                  - "yes"
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - image: {{ tpl $.Values.monitor.image.full $ }}
           imagePullPolicy: Always
