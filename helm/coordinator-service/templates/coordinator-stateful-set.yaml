@@ -13,7 +13,7 @@ spec:
     metadata:
       labels:
         app: {{ tpl $.Values.coordinator.fullName . }}
-        cpuheavy: no
+        cpuheavy: "no"
     spec:
       affinity:
         podAntiAffinity:
@@ -25,7 +25,8 @@ spec:
                 - key: cpuheavy
                   operator: In
                   values:
-                  - yes
+                  - "yes"
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - image: {{ tpl $.Values.coordinator.image.full . }}
           imagePullPolicy: Always
