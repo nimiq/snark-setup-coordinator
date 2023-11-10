@@ -44,6 +44,9 @@ spec:
             - name: secrets
               mountPath: "/secrets/"
               readOnly: true
+          resources:
+            requests:
+              cpu: "1.5"
       volumes:
         - name: secrets
           secret:
