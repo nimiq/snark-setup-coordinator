@@ -8,11 +8,11 @@ spec:
   selector:
     matchLabels:
       app: {{ tpl $.Values.monitor.fullName $ }}
-      cpuheavy: "no"
   template:
     metadata:
       labels:
         app: {{ tpl $.Values.monitor.fullName $ }}
+        cpuheavy: "no"
     spec:
       affinity:
         podAntiAffinity:
