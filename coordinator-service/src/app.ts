@@ -72,6 +72,28 @@ export function initExpress({
         },
     )
 
+    app.post(
+        '/change-key/:oldParticipantId/:newParticipantId',
+        authenticateRequests,
+        allowVerifiers,
+        (req, res) => {
+            const oldParticipantId = req.params.oldParticipantId
+            const newParticipantId = req.params.newParticipantId
+            logger.debug(
+                `POST /change-key/${oldParticipantId}/${newParticipantId}`,
+            )
+            try {
+                coordinator.change_key(oldParticipantId, newParticipantId)
+                res.json({
+                    status: 'ok',
+                })
+            } catch (err) {
+                logger.warn(err.message)
+                res.status(400).json({ status: 'error', message: err.message })
+            }
+        },
+    )
+
     app.get('/contributor/:participantId/chunks', (req, res) => {
         const participantId = req.params.participantId
         logger.debug(`GET /contributor/${participantId}/chunks`)

@@ -26,6 +26,7 @@ export interface ChunkDownloadInfo {
 export interface Coordinator {
     getCeremony(): ReadonlyCeremony
     setCeremony(ceremony: Ceremony): void
+    change_key(oldParticipantId: string, newParticipantId: string): void
     getParameters(setupId: string): SetupParameters
     getNumNonContributedChunks(setupId: string, contributorId: string): number
     getLockedChunks(setupId: string, participantId: string): UniqueChunkId[]

@@ -113,6 +113,16 @@ export class DiskCoordinator implements Coordinator {
         return this.db
     }
 
+    change_key(oldParticipantId: string, newParticipantId: string): void {
+        const index = this.db.contributorIds.findIndex((participantId) => participantId == oldParticipantId)
+        if (index == -1) {
+            throw new Error(`Unknown participantId ${oldParticipantId}`)
+        }
+        this.db.contributorIds[index] = newParticipantId;
+        this._writeDb();
+    }
+
+
     getParameters(setupId: string): SetupParameters {
         return clonedeep(DiskCoordinator._getSetup(this.db, setupId).parameters)
     }
@@ -250,7 +260,7 @@ export class DiskCoordinator implements Coordinator {
             lastResponseUrl:
                 contributions.length > 0
                     ? contributions[contributions.length - 1]
-                          .contributedLocation
+                        .contributedLocation
                     : null,
             lastChallengeUrl:
                 contributions.length > 0
@@ -342,7 +352,7 @@ export class DiskCoordinator implements Coordinator {
         if (chunk.lockHolder !== participantId) {
             throw new Error(
                 `Participant ${participantId} does not hold lock ` +
-                    `on chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
+                `on chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId}`,
             )
         }
         const now = timestamp()
@@ -350,8 +360,7 @@ export class DiskCoordinator implements Coordinator {
         if (verifier) {
             if (!isVerificationData(signedData)) {
                 throw new Error(
-                    `Data for chunk ${uniqueChunkId.setupId}-${
-                        uniqueChunkId.chunkId
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
                     } by participant ${participantId} is not valid verification data: ${JSON.stringify(
                         signedData,
                     )}`,
@@ -362,8 +371,7 @@ export class DiskCoordinator implements Coordinator {
             const contributorSignedData = contribution.contributedData
             if (!isContributorData(contributorSignedData)) {
                 throw new Error(
-                    `Data for chunk ${uniqueChunkId.setupId}-${
-                        uniqueChunkId.chunkId
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
                     } by participant ${participantId} during verification is not valid contributor data: ${JSON.stringify(
                         contributorSignedData,
                     )}`,
@@ -395,8 +403,7 @@ export class DiskCoordinator implements Coordinator {
         } else {
             if (!isContributorData(signedData)) {
                 throw new Error(
-                    `Data for chunk ${uniqueChunkId.setupId}-${
-                        uniqueChunkId.chunkId
+                    `Data for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
                     } by participant ${participantId} is not valid contributor data: ${JSON.stringify(
                         signedData,
                     )}`,
@@ -408,8 +415,7 @@ export class DiskCoordinator implements Coordinator {
                 previousContribution.verifiedData
             if (!isVerificationData(previousVerificationSignedData)) {
                 throw new Error(
-                    `During contribution for chunk ${uniqueChunkId.setupId}-${
-                        uniqueChunkId.chunkId
+                    `During contribution for chunk ${uniqueChunkId.setupId}-${uniqueChunkId.chunkId
                     } by participant ${participantId}, data is not valid verification data: ${JSON.stringify(
                         signedData,
                     )}`,
