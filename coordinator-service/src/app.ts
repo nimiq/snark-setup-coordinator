@@ -83,7 +83,7 @@ export function initExpress({
                 `POST /change-key/${oldParticipantId}/${newParticipantId}`,
             )
             try {
-                coordinator.change_key(oldParticipantId, newParticipantId)
+                coordinator.changeKey(oldParticipantId, newParticipantId)
                 res.json({
                     status: 'ok',
                 })
