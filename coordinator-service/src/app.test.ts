@@ -211,6 +211,11 @@ describe('app', () => {
                 .post('/change-key/becky/beck')
                 .set('authorization', 'dummy verifier0')
             expect(res).to.have.status(200)
+            expect(res.body.result.contributorIds).to.deep.equal([
+                'frank',
+                'beck',
+                'pat',
+            ])
 
             res = await chai.request(app).get('/ceremony')
             expect(res).to.have.status(200)
@@ -478,6 +483,62 @@ describe('app', () => {
             expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
             expect(res.body.result.unlocked).to.equal(true)
             expect(res.body.result.error).to.equal('stuff')
+        })
+    })
+
+    describe('GET /unlock-chunk/:setupId-:chunkId/:participantId', () => {
+        it('unlocks locked chunk', async () => {
+            let res
+
+            res = await chai
+                .request(app)
+                .post('/chunks/1-1/lock')
+                .set('authorization', 'dummy frank')
+                .send({})
+            expect(res).to.have.status(200)
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
+            expect(res.body.result.locked).to.equal(true)
+
+            res = await chai
+                .request(app)
+                .post('/unlock-chunk/1-1/frank')
+                .set('authorization', 'dummy verifier0')
+                .send({})
+            expect(res).to.have.status(200)
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
+            expect(res.body.result.unlocked).to.equal(true)
+        })
+
+        it('returns 400 if participant does not hold lock', async () => {
+            const res = await chai
+                .request(app)
+                .post('/unlock-chunk/1-1/frank')
+                .set('authorization', 'dummy verifier0')
+                .send({})
+            expect(res).to.have.status(400)
+        })
+
+        it('only verifiers can unlock', async () => {
+            let res
+
+            res = await chai
+                .request(app)
+                .post('/chunks/1-1/lock')
+                .set('authorization', 'dummy frank')
+                .send({})
+            expect(res).to.have.status(200)
+            expect(res.body.result.uniqueChunkId.chunkId).to.equal('1')
+            expect(res.body.result.uniqueChunkId.setupId).to.equal('1')
+            expect(res.body.result.locked).to.equal(true)
+
+            res = await chai
+                .request(app)
+                .post('/unlock-chunk/1-1/frank')
+                .set('authorization', 'dummy frank')
+                .send({ error: 'stuff' })
+            expect(res).to.have.status(403)
         })
     })
 

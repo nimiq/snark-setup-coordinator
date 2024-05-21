@@ -113,7 +113,7 @@ export class DiskCoordinator implements Coordinator {
         return this.db
     }
 
-    changeKey(oldParticipantId: string, newParticipantId: string): void {
+    changeKey(oldParticipantId: string, newParticipantId: string): string[] {
         const ceremony = this.db
         const index = ceremony.contributorIds.findIndex(
             (participantId) => participantId == oldParticipantId,
@@ -135,9 +135,11 @@ export class DiskCoordinator implements Coordinator {
             }
         }
 
-        this.db.contributorIds[index] = newParticipantId
+        ceremony.contributorIds[index] = newParticipantId
 
         this._writeDb()
+
+        return ceremony.contributorIds
     }
 
     getParameters(setupId: string): SetupParameters {

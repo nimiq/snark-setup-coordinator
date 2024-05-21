@@ -83,9 +83,15 @@ export function initExpress({
                 `POST /change-key/${oldParticipantId}/${newParticipantId}`,
             )
             try {
-                coordinator.changeKey(oldParticipantId, newParticipantId)
+                const contributorIds = coordinator.changeKey(
+                    oldParticipantId,
+                    newParticipantId,
+                )
                 res.json({
                     status: 'ok',
+                    result: {
+                        contributorIds,
+                    },
                 })
             } catch (err) {
                 logger.warn(err.message)
@@ -283,6 +289,39 @@ export function initExpress({
             res.status(400).json({ status: 'error', message: err.message })
         }
     })
+
+    app.post(
+        '/unlock-chunk/:setupId-:chunkId/:participantId',
+        authenticateRequests,
+        allowVerifiers,
+        (req, res) => {
+            const participantId = req.params.participantId
+            const setupId = req.params.setupId
+            const chunkId = req.params.chunkId
+            logger.debug(
+                `POST /unlock-chunk/${setupId}-${chunkId}/${participantId}`,
+            )
+            try {
+                const unlocked = coordinator.tryUnlockChunk(
+                    {
+                        setupId,
+                        chunkId,
+                    },
+                    participantId,
+                )
+                res.json({
+                    status: 'ok',
+                    result: {
+                        uniqueChunkId: { setupId, chunkId },
+                        unlocked,
+                    },
+                })
+            } catch (err) {
+                logger.warn(err.message)
+                res.status(400).json({ status: 'error', message: err.message })
+            }
+        },
+    )
 
     app.post(
         '/chunks/:setupId-:chunkId/unlock',
