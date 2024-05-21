@@ -197,6 +197,52 @@ describe('app', () => {
         })
     })
 
+    describe('POST /change-key', () => {
+        it('updates key', async () => {
+            let res
+
+            res = await chai.request(app).get('/ceremony')
+            expect(res).to.have.status(200)
+
+            const newCeremony = res.body.result
+
+            res = await chai
+                .request(app)
+                .post('/change-key/becky/beck')
+                .set('authorization', 'dummy verifier0')
+            expect(res).to.have.status(200)
+
+            res = await chai.request(app).get('/ceremony')
+            expect(res).to.have.status(200)
+
+            newCeremony.version = 1
+            newCeremony.contributorIds = ['frank', 'beck', 'pat']
+            expect(res.body.result).to.deep.equal(newCeremony)
+        })
+
+        it('rejects invalid updates', async () => {
+            let res
+
+            // Verifier only
+            res = await chai.request(app).post('/change-key/becky/beck')
+            expect(res).to.have.status(401)
+
+            // Non-existant
+            res = await chai
+                .request(app)
+                .post('/change-key/patty/patti')
+                .set('authorization', 'dummy verifier0')
+            expect(res).to.have.status(400)
+
+            // Already contributed
+            res = await chai
+                .request(app)
+                .post('/change-key/pat/patti')
+                .set('authorization', 'dummy verifier0')
+            expect(res).to.have.status(400)
+        })
+    })
+
     describe('GET /contributor/:participantId/chunks', () => {
         it('matches ceremony', async () => {
             const res = await chai.request(app).get('/contributor/pat/chunks')
