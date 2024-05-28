@@ -2,7 +2,11 @@ import bodyParser from 'body-parser'
 import express from 'express'
 import cors from 'cors'
 
-import { authenticate, AuthenticateStrategy } from './authenticate'
+import {
+    authenticate,
+    AuthenticateStrategy,
+    unverifiedParticipantId,
+} from './authenticate'
 import { authorize } from './authorize'
 import { ChunkStorage, Coordinator } from './coordinator'
 import { logger } from './logger'
@@ -43,6 +47,9 @@ export function initExpress({
     })
 
     const authenticateRequests = authenticate(authenticateStrategy)
+    const setUnverifiedParticipantId = unverifiedParticipantId(
+        authenticateStrategy,
+    )
 
     app.get('/ceremony', (req, res) => {
         logger.debug('GET /ceremony')
@@ -54,8 +61,9 @@ export function initExpress({
 
     app.put(
         '/ceremony',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowVerifiers,
+        authenticateRequests,
         bodyParser.json({ limit: '1000mb' }),
         (req, res) => {
             const ceremony = req.body
@@ -74,8 +82,9 @@ export function initExpress({
 
     app.post(
         '/change-key/:oldParticipantId/:newParticipantId',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowVerifiers,
+        authenticateRequests,
         (req, res) => {
             const oldParticipantId = req.params.oldParticipantId
             const newParticipantId = req.params.newParticipantId
@@ -185,8 +194,9 @@ export function initExpress({
 
     app.post(
         '/chunks/:setupId-:chunkId/lock',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowParticipants,
+        authenticateRequests,
         (req, res) => {
             const participantId = req.participantId
             const setupId = req.params.setupId
@@ -215,8 +225,9 @@ export function initExpress({
 
     app.post(
         '/attest',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowParticipants,
+        authenticateRequests,
         bodyParser.json(),
         (req, res) => {
             const participantId = req.participantId
@@ -292,8 +303,9 @@ export function initExpress({
 
     app.post(
         '/unlock-chunk/:setupId-:chunkId/:participantId',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowVerifiers,
+        authenticateRequests,
         (req, res) => {
             const participantId = req.params.participantId
             const setupId = req.params.setupId
@@ -325,8 +337,9 @@ export function initExpress({
 
     app.post(
         '/chunks/:setupId-:chunkId/unlock',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowParticipants,
+        authenticateRequests,
         bodyParser.json(),
         (req, res) => {
             const participantId = req.participantId
@@ -366,8 +379,9 @@ export function initExpress({
 
     app.get(
         '/chunks/:setupId-:chunkId/contribution',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowParticipants,
+        authenticateRequests,
         (req, res) => {
             const participantId = req.participantId
             const setupId = req.params.setupId
@@ -396,8 +410,9 @@ export function initExpress({
 
     app.post(
         '/chunks/:setupId-:chunkId/contribution',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowParticipants,
+        authenticateRequests,
         bodyParser.json(),
         async (req, res) => {
             const participantId = req.participantId
@@ -463,8 +478,9 @@ export function initExpress({
 
     app.post(
         '/shutdown-signal',
-        authenticateRequests,
+        setUnverifiedParticipantId,
         allowVerifiers,
+        authenticateRequests,
         bodyParser.json(),
         (req, res) => {
             logger.debug('POST /shutdown-signal')
